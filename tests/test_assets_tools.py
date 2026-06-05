@@ -1,0 +1,254 @@
+"""Comprehensive tests for asset and workstation tools."""
+
+import httpx
+import pytest
+import respx
+
+from .conftest import BASE, decode_body, decode_get_params, get_tool
+
+# ---------------------------------------------------------------------------
+# list_assets
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_list_assets_default_no_filters() -> None:
+    route = respx.get(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"assets": []})
+    )
+    await get_tool("list_assets").fn()
+    params = decode_get_params(route.calls[0])
+    assert params["list_info"]["start_index"] == 0
+    assert params["list_info"]["row_count"] == 25
+    assert "search_criteria" not in params["list_info"]
+
+
+@respx.mock
+async def test_list_assets_type_filter() -> None:
+    route = respx.get(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"assets": []})
+    )
+    await get_tool("list_assets").fn(asset_type="Laptop")
+    params = decode_get_params(route.calls[0])
+    criteria = params["list_info"]["search_criteria"]
+    assert criteria[0] == {"field": "asset_type.name", "condition": "is", "value": "Laptop"}
+
+
+@respx.mock
+async def test_list_assets_state_filter() -> None:
+    route = respx.get(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"assets": []})
+    )
+    await get_tool("list_assets").fn(state="In Use")
+    params = decode_get_params(route.calls[0])
+    criteria = params["list_info"]["search_criteria"]
+    assert criteria[0] == {"field": "asset_state", "condition": "is", "value": "In Use"}
+
+
+@respx.mock
+async def test_list_assets_both_filters() -> None:
+    route = respx.get(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"assets": []})
+    )
+    await get_tool("list_assets").fn(asset_type="Desktop", state="In Store")
+    params = decode_get_params(route.calls[0])
+    criteria = params["list_info"]["search_criteria"]
+    assert len(criteria) == 2
+    fields = {c["field"] for c in criteria}
+    assert fields == {"asset_type.name", "asset_state"}
+
+
+@respx.mock
+async def test_list_assets_pagination() -> None:
+    route = respx.get(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"assets": []})
+    )
+    await get_tool("list_assets").fn(page=3, page_size=50)
+    params = decode_get_params(route.calls[0])
+    assert params["list_info"]["start_index"] == 100
+    assert params["list_info"]["row_count"] == 50
+
+
+# ---------------------------------------------------------------------------
+# get_asset
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_get_asset_url() -> None:
+    route = respx.get(f"{BASE}/assets/100").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "100"}})
+    )
+    result = await get_tool("get_asset").fn(asset_id="100")
+    assert route.called
+    assert result["asset"]["id"] == "100"
+
+
+# ---------------------------------------------------------------------------
+# create_asset
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_create_asset_minimal() -> None:
+    route = respx.post(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "200"}})
+    )
+    await get_tool("create_asset").fn(name="LAPTOP-001", asset_type="Laptop")
+    payload = decode_body(route.calls[0])
+    assert payload["asset"]["name"] == "LAPTOP-001"
+    assert payload["asset"]["asset_type"] == {"name": "Laptop"}
+
+
+@respx.mock
+async def test_create_asset_omits_empty_optionals() -> None:
+    route = respx.post(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "201"}})
+    )
+    await get_tool("create_asset").fn(
+        name="LAPTOP-002", asset_type="Laptop",
+        serial_number="", vendor="", site="", department="", assigned_to=""
+    )
+    payload = decode_body(route.calls[0])
+    asset = payload["asset"]
+    for key in ("serial_number", "vendor", "site", "department", "used_by"):
+        assert key not in asset, f"unexpected key: {key}"
+
+
+@respx.mock
+async def test_create_asset_all_optional_fields() -> None:
+    route = respx.post(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "202"}})
+    )
+    await get_tool("create_asset").fn(
+        name="DESKTOP-010",
+        asset_type="Desktop",
+        serial_number="SN12345",
+        vendor="Dell",
+        site="HQ",
+        department="IT",
+        assigned_to="jdoe",
+    )
+    payload = decode_body(route.calls[0])
+    asset = payload["asset"]
+    assert asset["serial_number"] == "SN12345"
+    assert asset["vendor"] == {"name": "Dell"}
+    assert asset["site"] == {"name": "HQ"}
+    assert asset["department"] == {"name": "IT"}
+    assert asset["used_by"] == {"name": "jdoe"}
+
+
+# ---------------------------------------------------------------------------
+# update_asset
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_update_asset_state_key_name() -> None:
+    route = respx.put(f"{BASE}/assets/100").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "100"}})
+    )
+    await get_tool("update_asset").fn(asset_id="100", state="In Repair")
+    payload = decode_body(route.calls[0])
+    # SDP on-prem uses "asset_state" not "state"
+    assert payload["asset"]["asset_state"] == "In Repair"
+    assert "state" not in payload["asset"]
+
+
+@respx.mock
+async def test_update_asset_assigned_to_uses_used_by() -> None:
+    route = respx.put(f"{BASE}/assets/100").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "100"}})
+    )
+    await get_tool("update_asset").fn(asset_id="100", assigned_to="jdoe")
+    payload = decode_body(route.calls[0])
+    # SDP on-prem uses "used_by" not "assigned_to"
+    assert payload["asset"]["used_by"] == {"name": "jdoe"}
+    assert "assigned_to" not in payload["asset"]
+
+
+@respx.mock
+async def test_update_asset_all_empty_sends_empty_body() -> None:
+    route = respx.put(f"{BASE}/assets/100").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "100"}})
+    )
+    await get_tool("update_asset").fn(asset_id="100")
+    payload = decode_body(route.calls[0])
+    assert payload["asset"] == {}
+
+
+@respx.mock
+async def test_update_asset_site_and_department() -> None:
+    route = respx.put(f"{BASE}/assets/100").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "100"}})
+    )
+    await get_tool("update_asset").fn(
+        asset_id="100", site="Branch Office", department="Finance"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["asset"]["site"] == {"name": "Branch Office"}
+    assert payload["asset"]["department"] == {"name": "Finance"}
+
+
+# ---------------------------------------------------------------------------
+# list_workstations / get_workstation
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_list_workstations_default() -> None:
+    route = respx.get(f"{BASE}/workstations").mock(
+        return_value=httpx.Response(200, json={"workstations": []})
+    )
+    await get_tool("list_workstations").fn()
+    params = decode_get_params(route.calls[0])
+    assert params["list_info"]["start_index"] == 0
+    assert params["list_info"]["row_count"] == 25
+
+
+@respx.mock
+async def test_list_workstations_page2() -> None:
+    route = respx.get(f"{BASE}/workstations").mock(
+        return_value=httpx.Response(200, json={"workstations": []})
+    )
+    await get_tool("list_workstations").fn(page=2)
+    params = decode_get_params(route.calls[0])
+    assert params["list_info"]["start_index"] == 25
+
+
+@respx.mock
+async def test_get_workstation_url() -> None:
+    route = respx.get(f"{BASE}/workstations/55").mock(
+        return_value=httpx.Response(200, json={"workstation": {"id": "55"}})
+    )
+    result = await get_tool("get_workstation").fn(workstation_id="55")
+    assert route.called
+    assert result["workstation"]["id"] == "55"
+
+
+# ---------------------------------------------------------------------------
+# error propagation
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_404_raises_through_get_asset() -> None:
+    respx.get(f"{BASE}/assets/999").mock(
+        return_value=httpx.Response(404, json={"message": "Not found"})
+    )
+    with pytest.raises(httpx.HTTPStatusError) as exc_info:
+        await get_tool("get_asset").fn(asset_id="999")
+    assert exc_info.value.response.status_code == 404
+
+
+@respx.mock
+async def test_500_raises_through_create_asset() -> None:
+    respx.post(f"{BASE}/assets").mock(
+        return_value=httpx.Response(500, json={"message": "Internal error"})
+    )
+    with pytest.raises(httpx.HTTPStatusError):
+        await get_tool("create_asset").fn(name="X", asset_type="Laptop")
+
+
+@respx.mock
+async def test_403_raises_through_list_assets() -> None:
+    respx.get(f"{BASE}/assets").mock(
+        return_value=httpx.Response(403, json={"message": "Forbidden"})
+    )
+    with pytest.raises(httpx.HTTPStatusError) as exc_info:
+        await get_tool("list_assets").fn()
+    assert exc_info.value.response.status_code == 403

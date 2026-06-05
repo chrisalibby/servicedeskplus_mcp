@@ -1,0 +1,12 @@
+{
+  "pythonVersion": "3.11",
+  "include": ["src"],
+  "strict": [
+    "src/servicedeskplus_mcp/__init__.py",
+    "src/servicedeskplus_mcp/__main__.py",
+    "src/servicedeskplus_mcp/server.py",
+    "src/servicedeskplus_mcp/client.py",
+    "src/servicedeskplus_mcp/config.py",
+    "src/servicedeskplus_mcp/auth.py"
+  ]
+}
