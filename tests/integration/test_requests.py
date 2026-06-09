@@ -29,8 +29,14 @@ async def _create(client, subject: str) -> str:
 
 
 async def _delete(client, request_id: str) -> None:
-    """Trash then permanently delete a request."""
-    await client.delete(f"/requests/{request_id}/move_to_trash")
+    """Permanently remove a test request (trash + hard delete) for test cleanup only.
+    The delete_request tool itself only moves to trash — this goes further to
+    keep the test instance clean.
+    """
+    try:
+        await client.delete(f"/requests/{request_id}/move_to_trash")
+    except Exception:
+        pass
     await client.delete(f"/requests/{request_id}")
 
 

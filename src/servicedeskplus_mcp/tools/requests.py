@@ -118,12 +118,11 @@ def register(app: FastMCP) -> None:
 
     @app.tool()
     async def delete_request(
-        request_id: Annotated[str, "Request ID to delete"],
+        request_id: Annotated[str, "Request ID to move to trash"],
     ) -> dict[str, Any]:
-        """Permanently delete a service request (moves to trash then deletes)."""
+        """Move a service request to trash (recoverable from the SDP Trash view)."""
         async with get_client() as c:
-            await c.delete(f"/requests/{request_id}/move_to_trash")
-            return await c.delete(f"/requests/{request_id}")
+            return await c.delete(f"/requests/{request_id}/move_to_trash")
 
     @app.tool()
     async def assign_request(

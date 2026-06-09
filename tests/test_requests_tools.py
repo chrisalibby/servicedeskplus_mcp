@@ -238,19 +238,13 @@ async def test_close_request_comments_only_includes_closure_info() -> None:
 # ---------------------------------------------------------------------------
 
 @respx.mock
-async def test_delete_request_trash_then_delete() -> None:
-    trash = respx.delete(f"{BASE}/requests/99/move_to_trash").mock(
+async def test_delete_request_moves_to_trash_only() -> None:
+    route = respx.delete(f"{BASE}/requests/99/move_to_trash").mock(
         return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
     )
-    delete = respx.delete(f"{BASE}/requests/99").mock(
-        return_value=httpx.Response(
-            200, json={"response_status": {"status": "Success"}}
-        )
-    )
     result = await get_tool("delete_request").fn(request_id="99")
-    assert trash.called
-    assert delete.called
-    assert result["response_status"]["status"] == "Success"
+    assert route.called
+    assert result["response_status"]["status"] == "success"
 
 
 # ---------------------------------------------------------------------------
