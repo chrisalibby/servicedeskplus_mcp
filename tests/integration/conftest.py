@@ -56,7 +56,9 @@ class _LiveClient:
 
     async def get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         r = await self._http.get(path, params=params)
-        r.raise_for_status()
+        if not r.is_success:
+            from servicedeskplus_mcp.client import _sdp_error
+            return _sdp_error(r)
         result: dict[str, Any] = r.json()
         return result
 
@@ -65,7 +67,9 @@ class _LiveClient:
             path, data=self._encode(data),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        r.raise_for_status()
+        if not r.is_success:
+            from servicedeskplus_mcp.client import _sdp_error
+            return _sdp_error(r)
         result: dict[str, Any] = r.json()
         return result
 
@@ -74,13 +78,17 @@ class _LiveClient:
             path, data=self._encode(data),
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
-        r.raise_for_status()
+        if not r.is_success:
+            from servicedeskplus_mcp.client import _sdp_error
+            return _sdp_error(r)
         result: dict[str, Any] = r.json()
         return result
 
     async def delete(self, path: str) -> dict[str, Any]:
         r = await self._http.delete(path)
-        r.raise_for_status()
+        if not r.is_success:
+            from servicedeskplus_mcp.client import _sdp_error
+            return _sdp_error(r)
         result: dict[str, Any] = r.json()
         return result
 

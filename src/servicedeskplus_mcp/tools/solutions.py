@@ -61,4 +61,4 @@ def register(app: FastMCP) -> None:
         }
         params = {"input_data": json.dumps({"list_info": list_info})}
         async with get_client() as c:
-            return await c.get("/solution_topics", params=params)
+            return await c.get("/topics", params=params)

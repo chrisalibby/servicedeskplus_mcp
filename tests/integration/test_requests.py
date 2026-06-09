@@ -33,10 +33,9 @@ async def _delete(client, request_id: str) -> None:
     The delete_request tool itself only moves to trash — this goes further to
     keep the test instance clean.
     """
-    try:
+    import contextlib
+    with contextlib.suppress(Exception):
         await client.delete(f"/requests/{request_id}/move_to_trash")
-    except Exception:
-        pass
     await client.delete(f"/requests/{request_id}")
 
 

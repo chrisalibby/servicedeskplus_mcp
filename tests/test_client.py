@@ -4,7 +4,6 @@ import json
 from urllib.parse import parse_qs
 
 import httpx
-import pytest
 import respx
 
 from servicedeskplus_mcp.client import get_client
@@ -72,10 +71,46 @@ async def test_auth_header_sent() -> None:
 
 
 @respx.mock
-async def test_http_error_raises() -> None:
+async def test_4xx_returns_error_dict_not_exception() -> None:
     respx.get("http://sdp.test.local:8080/api/v3/requests").mock(
-        return_value=httpx.Response(401, json={"message": "Unauthorized"})
+        return_value=httpx.Response(401, json={
+            "response_status": {
+                "status_code": 4000,
+                "messages": [{"message": "Invalid API key"}],
+                "status": "failed",
+            }
+        })
     )
     async with get_client() as c:
-        with pytest.raises(httpx.HTTPStatusError):
-            await c.get("/requests")
+        result = await c.get("/requests")
+    assert "error" in result
+    assert "Invalid API key" in result["error"]
+    assert result["status_code"] == 401
+
+
+@respx.mock
+async def test_400_with_mandatory_fields_surfaces_message() -> None:
+    respx.post("http://sdp.test.local:8080/api/v3/requests").mock(
+        return_value=httpx.Response(400, json={
+            "response_status": {
+                "status_code": 4000,
+                "messages": [{"message": "Please fill the mandatory fields"}],
+                "status": "failed",
+            }
+        })
+    )
+    async with get_client() as c:
+        result = await c.post("/requests", {"request": {"subject": "test"}})
+    assert "error" in result
+    assert "mandatory fields" in result["error"]
+
+
+@respx.mock
+async def test_connect_error_returns_error_dict() -> None:
+    respx.get("http://sdp.test.local:8080/api/v3/requests").mock(
+        side_effect=httpx.ConnectError("Connection refused")
+    )
+    async with get_client() as c:
+        result = await c.get("/requests")
+    assert "error" in result
+    assert "connect" in result["error"].lower()

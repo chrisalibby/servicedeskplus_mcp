@@ -46,6 +46,7 @@ def register(app: FastMCP) -> None:
         description: Annotated[str, "Detailed description"] = "",
         requester_name: Annotated[str, "Requester's login name or email"] = "",
         category: Annotated[str, "Category name"] = "",
+        subcategory: Annotated[str, "Subcategory name (required on some instances)"] = "",
         priority: Annotated[str, "Priority name, e.g. 'High'"] = "",
         urgency: Annotated[str, "Urgency name"] = "",
         site: Annotated[str, "Site name"] = "",
@@ -60,6 +61,8 @@ def register(app: FastMCP) -> None:
             request["requester"] = {"name": requester_name}
         if category:
             request["category"] = {"name": category}
+        if subcategory:
+            request["subcategory"] = {"name": subcategory}
         if priority:
             request["priority"] = {"name": priority}
         if urgency:
@@ -80,6 +83,8 @@ def register(app: FastMCP) -> None:
         description: Annotated[str, "Updated description"] = "",
         status: Annotated[str, "New status name"] = "",
         priority: Annotated[str, "New priority name"] = "",
+        category: Annotated[str, "New category name"] = "",
+        subcategory: Annotated[str, "New subcategory name"] = "",
         technician: Annotated[str, "New assigned technician login name"] = "",
         group: Annotated[str, "New group name"] = "",
     ) -> dict[str, Any]:
@@ -93,6 +98,10 @@ def register(app: FastMCP) -> None:
             request["status"] = {"name": status}
         if priority:
             request["priority"] = {"name": priority}
+        if category:
+            request["category"] = {"name": category}
+        if subcategory:
+            request["subcategory"] = {"name": subcategory}
         if technician:
             request["technician"] = {"name": technician}
         if group:

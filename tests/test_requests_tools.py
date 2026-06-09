@@ -1,7 +1,6 @@
 """Comprehensive tests for service request (ticket) tools."""
 
 import httpx
-import pytest
 import respx
 
 from .conftest import BASE, decode_body, decode_get_params, get_tool
@@ -436,33 +435,43 @@ async def test_add_request_task_with_assignee() -> None:
 
 
 # ---------------------------------------------------------------------------
-# error propagation
+# error handling — errors return readable dicts, not exceptions
 # ---------------------------------------------------------------------------
 
 @respx.mock
-async def test_404_raises_through_get_request() -> None:
+async def test_404_returns_error_dict() -> None:
     respx.get(f"{BASE}/requests/999").mock(
-        return_value=httpx.Response(404, json={"message": "Not found"})
+        return_value=httpx.Response(404, json={
+            "response_status": {"messages": [{"message": "Request not found"}], "status": "failed"}
+        })
     )
-    with pytest.raises(httpx.HTTPStatusError) as exc_info:
-        await get_tool("get_request").fn(request_id="999")
-    assert exc_info.value.response.status_code == 404
+    result = await get_tool("get_request").fn(request_id="999")
+    assert "error" in result
+    assert result["status_code"] == 404
 
 
 @respx.mock
-async def test_500_raises_through_create_request() -> None:
+async def test_400_surfaces_sdp_message() -> None:
     respx.post(f"{BASE}/requests").mock(
-        return_value=httpx.Response(500, json={"message": "Internal error"})
+        return_value=httpx.Response(400, json={
+            "response_status": {
+                "messages": [{"message": "Please fill the mandatory fields"}],
+                "status": "failed",
+            }
+        })
     )
-    with pytest.raises(httpx.HTTPStatusError) as exc_info:
-        await get_tool("create_request").fn(subject="Test")
-    assert exc_info.value.response.status_code == 500
+    result = await get_tool("create_request").fn(subject="Test")
+    assert "error" in result
+    assert "mandatory" in result["error"]
 
 
 @respx.mock
-async def test_401_raises_through_list_requests() -> None:
+async def test_401_returns_error_dict() -> None:
     respx.get(f"{BASE}/requests").mock(
-        return_value=httpx.Response(401, json={"message": "Unauthorized"})
+        return_value=httpx.Response(401, json={
+            "response_status": {"messages": [{"message": "Invalid API key"}], "status": "failed"}
+        })
     )
-    with pytest.raises(httpx.HTTPStatusError):
-        await get_tool("list_requests").fn()
+    result = await get_tool("list_requests").fn()
+    assert "error" in result
+    assert result["status_code"] == 401
