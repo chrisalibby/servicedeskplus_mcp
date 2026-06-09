@@ -1,56 +1,56 @@
 # servicedeskplus-mcp
 
-An MCP (Model Context Protocol) server that exposes ManageEngine ServiceDesk Plus On-Premise as tools for AI assistants. Connect Claude Desktop, Claude Code, or any MCP-compatible client to your SDP instance and manage requests, problems, changes, assets, CMDB, and knowledge base articles through natural language.
+An MCP (Model Context Protocol) server that exposes ManageEngine ServiceDesk Plus On-Premise as tools for AI assistants. Connect Claude Desktop, Claude Code, or any MCP-compatible client to your SDP instance and manage requests, problems, changes, assets, and knowledge base articles through natural language.
 
 ## Features
 
-- **Service Requests** — list, create, update, close, delete, assign, pick up, add notes/worklogs/tasks, manage resolutions
+- **Service Requests** — list, create, update, close, trash, assign, pick up, add notes/tasks, manage resolutions
 - **Problems** — list, create, update, close, add notes
 - **Changes** — list, create, update, close, add notes/tasks, manage approvals (approve/reject)
 - **Assets** — list, create, update assets and workstations
-- **CMDB** — list, create, update configuration items; manage CI relationships
+- **CMDB** — list, create, update configuration items; manage CI relationships *(availability depends on your SDP license)*
 - **Knowledge Base** — search solutions, get/create articles, list topics
-- **Admin lookups** — requesters, technicians, groups, sites, categories, priorities, statuses, urgencies, departments, announcements
+- **Admin lookups** — requesters, technicians, sites, categories, subcategories, priorities, statuses, urgencies, departments, announcements
 
 ## Requirements
 
 - Python 3.11 or later
 - ManageEngine ServiceDesk Plus On-Premise **v14+** (API v3)
-- An SDP API key (see below)
+- An SDP API key — each technician generates their own (see below)
 
 ## Installation
 
-### With uv (recommended)
+### From source with uv (recommended for development)
 
 ```bash
-uv tool install servicedeskplus-mcp
+git clone https://github.com/chrisalibby/servicedeskplus_mcp.git
+cd servicedeskplus_mcp
+uv sync --extra dev
+cp .env.example .env
+# edit .env — see Configuration below
 ```
 
-### With pip
+### With uv tool install
 
 ```bash
-pip install servicedeskplus-mcp
-```
-
-### From source
-
-```bash
-git clone https://github.com/clibby/servicedeskplus-mcp.git
-cd servicedeskplus-mcp
-uv sync
+uv tool install git+https://github.com/chrisalibby/servicedeskplus_mcp.git
 ```
 
 ## Generating an API Key
 
-1. Log in to ServiceDesk Plus as an administrator.
-2. Navigate to **Admin** → **Users** → **Technicians**.
-3. Open the technician record you want to use for API access.
-4. Click **Generate** next to the API Key field.
-5. Copy the key and set it as `SDP_API_KEY` in your environment (see Configuration below).
+Each technician generates their own key — actions taken through the MCP server appear in SDP audit logs under their account.
+
+1. Log in to ServiceDesk Plus as yourself.
+2. Click your **profile / avatar** in the top-right corner.
+3. Select **My Profile** (or **Edit Profile**).
+4. Scroll to the **API Key** section and click **Generate**.
+5. Copy the key into `SDP_API_KEY` in your `.env`.
+
+> If the API Key section is not visible, ask an admin to enable API access for your technician role under **Admin → Technician Roles**.
 
 ## Configuration
 
-The server reads configuration from environment variables. Copy `.env.example` to `.env` and fill in your values:
+Copy `.env.example` to `.env` and fill in your values:
 
 ```bash
 cp .env.example .env
@@ -59,41 +59,29 @@ cp .env.example .env
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `SDP_SERVER` | yes | `localhost` | Hostname or IP of your SDP server |
-| `SDP_PORT` | no | `8080` | HTTP port SDP listens on |
-| `SDP_API_KEY` | yes | — | API key generated in SDP Admin |
-| `SDP_PORTAL_ID` | no | `` | Portal ID for multi-portal setups |
+| `SDP_PORT` | no | `8080` | Port — use `443` for HTTPS |
+| `SDP_API_KEY` | yes | — | Your personal API key |
+| `SDP_PORTAL_ID` | no | `` | Portal name for multi-portal setups |
 | `SDP_TIMEOUT` | no | `30` | Request timeout in seconds |
+| `SDP_VERIFY_SSL` | no | `true` | Set `false` for self-signed certificates |
+
+**HTTPS / self-signed certificates:** If your SDP runs on port 443 with an internal CA or self-signed cert, set `SDP_PORT=443` and `SDP_VERIFY_SSL=false`.
+
+**Instance-specific mandatory fields:** Some SDP instances require `category`, `subcategory`, `description`, and `requester` on every new request. If `create_request` returns an error like *"Please fill the mandatory fields"*, use those parameters. The tool will return the SDP error text directly rather than raising an exception, so the message is always readable.
 
 ## Claude Desktop Configuration
-
-Add this to your Claude Desktop `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "servicedeskplus": {
-      "command": "sdp-mcp",
-      "env": {
-        "SDP_SERVER": "your-sdp-server.example.com",
-        "SDP_PORT": "8080",
-        "SDP_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
-
-If you installed from source with `uv`:
 
 ```json
 {
   "mcpServers": {
     "servicedeskplus": {
       "command": "uv",
-      "args": ["run", "--project", "/path/to/servicedeskplus-mcp", "sdp-mcp"],
+      "args": ["run", "--project", "/path/to/servicedeskplus_mcp", "sdp-mcp"],
       "env": {
         "SDP_SERVER": "your-sdp-server.example.com",
-        "SDP_API_KEY": "your-api-key-here"
+        "SDP_PORT": "443",
+        "SDP_API_KEY": "your-api-key-here",
+        "SDP_VERIFY_SSL": "false"
       }
     }
   }
@@ -108,10 +96,13 @@ Add to your project or global `.claude/settings.json`:
 {
   "mcpServers": {
     "servicedeskplus": {
-      "command": "sdp-mcp",
+      "command": "uv",
+      "args": ["run", "--project", "/path/to/servicedeskplus_mcp", "sdp-mcp"],
       "env": {
         "SDP_SERVER": "your-sdp-server.example.com",
-        "SDP_API_KEY": "your-api-key-here"
+        "SDP_PORT": "443",
+        "SDP_API_KEY": "your-api-key-here",
+        "SDP_VERIFY_SSL": "false"
       }
     }
   }
@@ -124,14 +115,14 @@ Add to your project or global `.claude/settings.json`:
 
 | Tool | Description |
 |---|---|
-| `list_requests` | List requests with optional status/technician filters |
+| `list_requests` | List requests with optional status/technician filters and pagination |
 | `get_request` | Get a single request by ID |
-| `create_request` | Create a new service request |
+| `create_request` | Create a new service request (supports subcategory) |
 | `update_request` | Update fields on an existing request |
-| `close_request` | Close a request with closure code and comments |
-| `delete_request` | Permanently delete a request |
-| `assign_request` | Assign a request to a technician/group |
-| `pickup_request` | Pick up a request (assign to API key owner) |
+| `close_request` | Close a request; closure code is optional |
+| `delete_request` | Move a request to trash (recoverable from SDP Trash view) |
+| `assign_request` | Assign a request to a technician and/or group |
+| `pickup_request` | Pick up a request (assign to the API key owner) |
 | `add_request_note` | Add a public or private note |
 | `list_request_notes` | List all notes on a request |
 | `add_request_worklog` | Log time worked on a request |
@@ -220,33 +211,33 @@ Add to your project or global `.claude/settings.json`:
 ### Setup
 
 ```bash
-git clone https://github.com/clibby/servicedeskplus-mcp.git
-cd servicedeskplus-mcp
+git clone https://github.com/chrisalibby/servicedeskplus_mcp.git
+cd servicedeskplus_mcp
 uv sync --extra dev
 cp .env.example .env
-# edit .env with your SDP credentials
+# edit .env with your credentials
 ```
 
-### Run tests
+### Run unit tests (no server needed)
 
 ```bash
 uv run pytest
 ```
 
-### Lint
+### Run integration tests (requires live SDP in `.env`)
+
+```bash
+uv run pytest tests/integration/ -m integration -v
+```
+
+### Lint and type check
 
 ```bash
 uv run ruff check src tests
-uv run ruff format --check src tests
-```
-
-### Type check
-
-```bash
 uv run pyright
 ```
 
-### Run the server locally
+### Run the server
 
 ```bash
 uv run sdp-mcp
@@ -254,21 +245,25 @@ uv run sdp-mcp
 uv run python -m servicedeskplus_mcp
 ```
 
-### Integration tests
+## Known Limitations
 
-The unit test suite uses `respx` to mock httpx — no real SDP instance needed. For manual integration testing against the ManageEngine demo instance:
+These were discovered during integration testing against a real on-prem instance:
 
-1. Go to `demo.servicedeskplus.com` and log in as `admin` / `administrator`.
-2. Generate an API key under **Admin → Technicians**.
-3. Set `SDP_SERVER=demo.servicedeskplus.com SDP_PORT=443` (or the appropriate port) and `SDP_API_KEY=<key>` in your `.env`.
-4. Run `uv run sdp-mcp` and point your MCP client at it.
+| Area | Status | Notes |
+|---|---|---|
+| Worklogs | Broken | `POST /requests/{id}/worklogs` rejects all field formats with 400. Time entry is enabled in SDP Admin but the API contract is unclear. To debug: open a ticket, add a time entry in the UI, capture the request in browser DevTools. |
+| Groups (`list_groups`) | May 404 | `/groups` endpoint returns 404 or 400 on some instances. |
+| CMDB (`list_configuration_items`) | May be unavailable | `/ci` returns 400/404 on instances without CMDB licensed or enabled. |
+| Closure codes | Optional | `close_request` works without a closure code; include one only if your instance requires it. |
+| `delete_request` | Trash only | Moves to SDP Trash (recoverable). There is no permanently-delete tool. |
 
 ## Roadmap
 
-- **Cloud/OAuth2 support** — ManageEngine ServiceDesk Plus Cloud uses OAuth2 rather than API key auth. This is planned as the next major feature.
-- **Attachments** — Upload and download file attachments on requests, problems, and changes.
-- **Bulk operations** — Batch-update multiple records in a single tool call.
-- **Webhooks / SSE** — Subscribe to SDP events and surface them as MCP notifications.
+- **Resolve worklog API** — capture browser network traffic to determine correct field format for on-prem v14
+- **Cloud / OAuth2 support** — SDP Cloud uses OAuth2; planned as next major feature
+- **Attachments** — upload and download file attachments on requests, problems, and changes
+- **Bulk operations** — batch-update multiple records in a single tool call
+- **Date range filters** — `list_requests` filtered by open date, due date, etc.
 
 ## License
 
