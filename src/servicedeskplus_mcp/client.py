@@ -16,6 +16,7 @@ class SDPClient:
             base_url=settings.base_url,
             headers=self._headers,
             timeout=settings.SDP_TIMEOUT,
+            verify=settings.SDP_VERIFY_SSL,
         )
 
     async def __aenter__(self) -> "SDPClient":

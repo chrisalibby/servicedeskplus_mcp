@@ -13,10 +13,16 @@ class Settings(BaseSettings):
     SDP_API_KEY: str
     SDP_PORTAL_ID: str = ""
     SDP_TIMEOUT: float = 30.0
+    # Set to false for internal servers with self-signed certificates
+    SDP_VERIFY_SSL: bool = True
+
+    @property
+    def scheme(self) -> str:
+        return "https" if self.SDP_PORT == 443 else "http"
 
     @property
     def base_url(self) -> str:
-        host = f"http://{self.SDP_SERVER}:{self.SDP_PORT}"
+        host = f"{self.scheme}://{self.SDP_SERVER}:{self.SDP_PORT}"
         if self.SDP_PORTAL_ID:
             return f"{host}/{self.SDP_PORTAL_ID}/api/v3"
         return f"{host}/api/v3"

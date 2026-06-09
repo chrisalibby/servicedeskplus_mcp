@@ -103,28 +103,26 @@ def register(app: FastMCP) -> None:
     @app.tool()
     async def close_request(
         request_id: Annotated[str, "Request ID to close"],
-        closure_code: Annotated[str, "Closure code name"] = "Successful",
+        closure_code: Annotated[str, "Closure code name (optional — omit if not configured)"] = "",
         closure_comments: Annotated[str, "Comments explaining closure"] = "",
     ) -> dict[str, Any]:
         """Close a service request."""
-        data: dict[str, Any] = {
-            "request": {
-                "status": {"name": "Closed"},
-                "closure_info": {
-                    "closure_code": {"name": closure_code},
-                    "closure_comments": closure_comments,
-                },
+        request: dict[str, Any] = {"status": {"name": "Closed"}}
+        if closure_code or closure_comments:
+            request["closure_info"] = {
+                "closure_code": {"name": closure_code} if closure_code else {},
+                "closure_comments": closure_comments,
             }
-        }
         async with get_client() as c:
-            return await c.put(f"/requests/{request_id}", data)
+            return await c.put(f"/requests/{request_id}", {"request": request})
 
     @app.tool()
     async def delete_request(
         request_id: Annotated[str, "Request ID to delete"],
     ) -> dict[str, Any]:
-        """Permanently delete a service request."""
+        """Permanently delete a service request (moves to trash then deletes)."""
         async with get_client() as c:
+            await c.delete(f"/requests/{request_id}/move_to_trash")
             return await c.delete(f"/requests/{request_id}")
 
     @app.tool()

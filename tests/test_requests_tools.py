@@ -193,7 +193,7 @@ async def test_update_request_all_empty_sends_empty_dict() -> None:
 # ---------------------------------------------------------------------------
 
 @respx.mock
-async def test_close_request_default_closure_code() -> None:
+async def test_close_request_no_closure_info_by_default() -> None:
     route = respx.put(f"{BASE}/requests/7").mock(
         return_value=httpx.Response(200, json={"request": {"id": "7"}})
     )
@@ -201,12 +201,11 @@ async def test_close_request_default_closure_code() -> None:
     payload = decode_body(route.calls[0])
     req = payload["request"]
     assert req["status"] == {"name": "Closed"}
-    assert req["closure_info"]["closure_code"] == {"name": "Successful"}
-    assert req["closure_info"]["closure_comments"] == ""
+    assert "closure_info" not in req
 
 
 @respx.mock
-async def test_close_request_custom_code_and_comments() -> None:
+async def test_close_request_with_closure_code() -> None:
     route = respx.put(f"{BASE}/requests/7").mock(
         return_value=httpx.Response(200, json={"request": {"id": "7"}})
     )
@@ -221,19 +220,36 @@ async def test_close_request_custom_code_and_comments() -> None:
     assert ci["closure_comments"] == "Replaced the cable"
 
 
+@respx.mock
+async def test_close_request_comments_only_includes_closure_info() -> None:
+    route = respx.put(f"{BASE}/requests/7").mock(
+        return_value=httpx.Response(200, json={"request": {"id": "7"}})
+    )
+    await get_tool("close_request").fn(
+        request_id="7", closure_comments="Done"
+    )
+    payload = decode_body(route.calls[0])
+    assert "closure_info" in payload["request"]
+    assert payload["request"]["closure_info"]["closure_comments"] == "Done"
+
+
 # ---------------------------------------------------------------------------
 # delete_request
 # ---------------------------------------------------------------------------
 
 @respx.mock
-async def test_delete_request_method_and_url() -> None:
-    route = respx.delete(f"{BASE}/requests/99").mock(
+async def test_delete_request_trash_then_delete() -> None:
+    trash = respx.delete(f"{BASE}/requests/99/move_to_trash").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    delete = respx.delete(f"{BASE}/requests/99").mock(
         return_value=httpx.Response(
             200, json={"response_status": {"status": "Success"}}
         )
     )
     result = await get_tool("delete_request").fn(request_id="99")
-    assert route.called
+    assert trash.called
+    assert delete.called
     assert result["response_status"]["status"] == "Success"
 
 
