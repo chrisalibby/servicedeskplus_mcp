@@ -94,9 +94,7 @@ def register(app: FastMCP) -> None:
     async def add_problem_note(
         problem_id: Annotated[str, "Problem ID"],
         note_text: Annotated[str, "Note content"],
-        is_public: Annotated[bool, "Visible to requester?"] = False,
     ) -> dict[str, Any]:
         """Add a note to a problem record."""
-        data = {"note": {"description": note_text, "show_to_requester": is_public}}
         async with get_client() as c:
-            return await c.post(f"/problems/{problem_id}/notes", data)
+            return await c.post(f"/problems/{problem_id}/notes", {"note": {"description": note_text}})

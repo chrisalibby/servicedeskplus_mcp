@@ -92,8 +92,8 @@ def register(app: FastMCP) -> None:
         change_id: Annotated[str, "Change ID to close"],
         closure_comments: Annotated[str, "Closure comments"] = "",
     ) -> dict[str, Any]:
-        """Close a change record."""
-        change: dict[str, Any] = {"status": {"name": "Closed"}}
+        """Close a change record. Note: requires the change to be in a closeable workflow state."""
+        change: dict[str, Any] = {"status": {"name": "Completed"}}
         if closure_comments:
             change["closure_comments"] = closure_comments
         async with get_client() as c:
@@ -103,12 +103,10 @@ def register(app: FastMCP) -> None:
     async def add_change_note(
         change_id: Annotated[str, "Change ID"],
         note_text: Annotated[str, "Note content"],
-        is_public: Annotated[bool, "Visible to requester?"] = False,
     ) -> dict[str, Any]:
         """Add a note to a change record."""
-        data = {"note": {"description": note_text, "show_to_requester": is_public}}
         async with get_client() as c:
-            return await c.post(f"/changes/{change_id}/notes", data)
+            return await c.post(f"/changes/{change_id}/notes", {"note": {"description": note_text}})
 
     @app.tool()
     async def list_change_tasks(

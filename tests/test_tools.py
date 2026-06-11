@@ -35,8 +35,9 @@ def test_expected_tools_registered() -> None:
         "list_ci_relationships", "add_ci_relationship",
         "search_solutions", "get_solution", "create_solution", "list_solution_topics",
         "list_requesters", "get_requester", "list_technicians", "get_technician",
-        "list_groups", "list_sites", "list_categories", "list_priorities",
-        "list_statuses", "list_urgencies", "list_departments", "list_announcements",
+        "list_groups", "list_sites", "list_categories", "list_subcategories",
+        "list_priorities", "list_statuses", "list_urgencies", "list_departments",
+        "list_announcements",
     }
     missing = required - names
     assert not missing, f"Missing tools: {missing}"

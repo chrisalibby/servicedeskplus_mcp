@@ -3,12 +3,13 @@
 ## Current state (as of June 2026)
 
 Integration tested against `sdp.example.com` (Spero Financial SDP on-prem instance).
-All unit tests pass (73). Integration tests: 25 pass, 3 skip (see Known Gaps below).
+All unit tests pass (74). Integration tests: 35 pass, 2 skip (see Known Gaps below).
 
 ### What works
 
 - Full CRUD for requests, problems, changes, assets, workstations
-- Notes, tasks, resolution on requests
+- CMDB: list all CIs (`/cmdb`), get by ID, filter by module type (`cmdb_itservice`, `cmdb_departmentci`, `cmdb_people`, `cmdb_supportgroup`, `cmdb_switchportci`)
+- Notes, tasks, worklogs, resolution on requests
 - Change approvals (approve/reject)
 - All admin lookup endpoints: statuses, priorities, categories, subcategories, sites, departments, urgencies, technicians, requesters, announcements
 - Knowledge base: search solutions, get/create articles, list topics
@@ -20,9 +21,9 @@ All unit tests pass (73). Integration tests: 25 pass, 3 skip (see Known Gaps bel
 
 | Gap | Detail |
 |---|---|
-| **Worklogs** | `POST /requests/{id}/worklogs` returns 400 for all field formats tried. Time entry is enabled in SDP Admin. To debug: create a ticket, add a time entry in the UI, open browser DevTools → Network, filter for `worklogs`, copy the successful POST as cURL. That will show the exact payload SDP expects. |
 | **Groups** (`list_groups`) | `/groups` returns 400/404. May require a different endpoint path on this SDP version. |
-| **CMDB** (`list_configuration_items`) | `/ci` returns 400. CMDB may not be licensed or the endpoint path may differ on this version. |
+| **CMDB create/update/relationships** | `POST /cmdb` and `/cmdb/{id}/relationships` return 404. List and get-by-ID work. |
+| **`close_change`** | Changes require workflow progression (Requested → In Review → Approved → In Progress → Completed). Direct status PUT is rejected on this instance. The tool is kept for other instances with simpler configurations. |
 
 ### Instance-specific configuration (Spero Financial)
 
@@ -43,7 +44,16 @@ All unit tests pass (73). Integration tests: 25 pass, 3 skip (see Known Gaps bel
 ```bash
 git clone https://github.com/chrisalibby/servicedeskplus_mcp.git
 cd servicedeskplus_mcp
+```
+
+With `uv` (preferred for dev):
+```bash
 uv sync --extra dev
+```
+
+With standard `pip`:
+```bash
+pip install -e ".[dev]"
 ```
 
 ### 2. Create your `.env`
@@ -66,36 +76,27 @@ SDP_VERIFY_SSL=false
 ### 3. Verify unit tests pass
 
 ```bash
-uv run pytest
-# Expected: 73 passed, 28 deselected
+pytest
+# or: uv run pytest
+# Expected: 74 passed, 37 deselected
 ```
 
 ### 4. Run integration smoke tests
 
 ```bash
-uv run pytest tests/integration/test_smoke.py -m integration -v -s
+pytest tests/integration/test_smoke.py -m integration -v -s
 # Expected: 6 passed — also prints statuses, priorities, categories, technicians
 ```
 
 ### 5. Run full integration suite
 
 ```bash
-uv run pytest tests/integration/ -m integration -v
-# Expected: 25 passed, 3 skipped (worklogs, CMDB, groups)
+pytest tests/integration/ -m integration -v
+# Expected: 35 passed, 2 skipped (groups, change_close workflow)
 ```
 
 ---
 
 ## Recommended next work
 
-1. **Resolve worklogs** — highest value unresolved item. Capture a real worklog POST from the browser as described above. Update `add_request_worklog` and its skip marker in `tests/integration/test_requests.py`.
-
-2. **Date range filters on `list_requests`** — technicians frequently need "tickets opened this week" or "overdue items". Add `opened_after`, `opened_before`, `due_before` parameters using SDP's `search_criteria` date condition format.
-
-3. **`list_subcategories` tool** — subcategories are fetched in integration tests directly but there's no MCP tool exposed for them. Add to `admin.py` so an AI can look up valid subcategory names before creating a request.
-
-4. **Write tests for problems and changes** — `test_remaining_modules.py` only reads; add create/update/close round-trips matching the pattern in `test_requests.py`.
-
-5. **Claude Desktop / Claude Code setup at Spero** — once the server is stable, configure it in the team's Claude Desktop config pointing at `sdp.example.com`. Each technician uses their own API key.
-
-6. **CMDB investigation** — check whether CMDB is enabled in SDP Admin and whether the API path differs on this version.
+1. **Claude Desktop / Claude Code setup at Spero** — see `SETUP.md` for the per-technician configuration guide. Each technician generates their own SDP API key and adds the server to their local Claude Desktop config.

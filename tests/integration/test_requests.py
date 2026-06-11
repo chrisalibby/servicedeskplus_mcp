@@ -89,20 +89,19 @@ async def test_add_and_list_note(client) -> None:
         await _delete(client, request_id)
 
 
-@pytest.mark.skip(
-    reason="Worklog API is not functional on this instance — every field "
-           "combination returns 400 ('Unable to parse the JSON' / 'Extra key "
-           "found'). Time tracking may be disabled or requires a different "
-           "API contract than documented for v3 on-prem."
-)
 async def test_add_worklog(client) -> None:
     """Create a request and log 30 minutes of work."""
     request_id = await _create(client, "worklog test")
     try:
         worklog = await client.post(f"/requests/{request_id}/worklogs", {
-            "worklog": {"description": "Integration test worklog", "time_spent": 30}
+            "worklog": {
+                "description": "Integration test worklog",
+                "time_spent": {"hours": 0, "minutes": 30},
+                "owner": {"email_id": "clibby@spero.financial"},
+            }
         })
         assert "worklog" in worklog
+        assert worklog["worklog"]["time_spent"]["minutes"] == "30"
     finally:
         await _delete(client, request_id)
 

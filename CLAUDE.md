@@ -43,7 +43,12 @@ Integration test status: **25 pass, 3 skip**
 | `list_solution_topics` | Uses `/topics` endpoint, not `/solution_topics` |
 | `delete_request` | `DELETE /requests/{id}/move_to_trash` only — no permanent delete |
 | `close_request` | Omit `closure_code` unless explicitly configured; including it causes 400 on this instance |
-| `add_request_worklog` | Skipped — `POST /requests/{id}/worklogs` rejects all tested formats |
+| `add_request_worklog` | `time_spent` must be `{"hours": N, "minutes": N}`; owner is required as `{"email_id": "user@domain"}` |
+| `list_requests` date filters | `opened_after`/`opened_before`/`due_before` cannot be combined with each other or with `status`/`technician` — SDP returns 400 on multi-criteria arrays containing date fields |
+| `add_problem_note`, `add_change_note` | `show_to_requester` is rejected — these endpoints don't support it (unlike request notes) |
+| `close_change` | Status transitions on changes require workflow progression; direct PUT to terminal status is rejected on this instance |
+| Change note GET | `GET /changes/{id}/notes` omits `description` from list items — only the POST response includes it |
+| `list_configuration_items` | Uses `/cmdb` (not `/ci`). Filter by `module_type` using `api_plural_name` values: `cmdb_itservice`, `cmdb_departmentci`, `cmdb_people`, `cmdb_supportgroup`, `cmdb_switchportci`. Create/update/relationships return 404 on this instance. |
 
 ## Code style
 

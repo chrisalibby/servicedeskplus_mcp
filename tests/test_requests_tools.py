@@ -79,6 +79,44 @@ async def test_list_requests_both_filters() -> None:
     assert "technician.name" in fields
 
 
+@respx.mock
+async def test_list_requests_opened_after() -> None:
+    route = respx.get(f"{BASE}/requests").mock(
+        return_value=httpx.Response(200, json={"requests": []})
+    )
+    await get_tool("list_requests").fn(opened_after="2026-06-01")
+    params = decode_get_params(route.calls[0])
+    criteria = params["list_info"]["search_criteria"]
+    assert len(criteria) == 1
+    assert criteria[0]["field"] == "created_time"
+    assert criteria[0]["condition"] == "gt"
+    assert criteria[0]["value"] == "1780272000000"  # 2026-06-01 UTC midnight
+
+
+@respx.mock
+async def test_list_requests_opened_before() -> None:
+    route = respx.get(f"{BASE}/requests").mock(
+        return_value=httpx.Response(200, json={"requests": []})
+    )
+    await get_tool("list_requests").fn(opened_before="2026-07-01")
+    params = decode_get_params(route.calls[0])
+    criteria = params["list_info"]["search_criteria"]
+    assert criteria[0]["field"] == "created_time"
+    assert criteria[0]["condition"] == "lt"
+
+
+@respx.mock
+async def test_list_requests_due_before() -> None:
+    route = respx.get(f"{BASE}/requests").mock(
+        return_value=httpx.Response(200, json={"requests": []})
+    )
+    await get_tool("list_requests").fn(due_before="2026-07-01")
+    params = decode_get_params(route.calls[0])
+    criteria = params["list_info"]["search_criteria"]
+    assert criteria[0]["field"] == "due_by_time"
+    assert criteria[0]["condition"] == "lt"
+
+
 # ---------------------------------------------------------------------------
 # get_request
 # ---------------------------------------------------------------------------
@@ -323,40 +361,17 @@ async def test_list_request_notes_url() -> None:
 # ---------------------------------------------------------------------------
 
 @respx.mock
-async def test_add_worklog_hours_to_minutes_conversion() -> None:
+async def test_add_worklog_payload_shape() -> None:
     route = respx.post(f"{BASE}/requests/8/worklogs").mock(
         return_value=httpx.Response(200, json={"worklog": {"id": "1"}})
     )
     await get_tool("add_request_worklog").fn(
-        request_id="8", description="Fixed switch", hours=1.5
+        request_id="8", description="Fixed switch",
+        technician_email="jdoe@example.com", hours=1, minutes=30,
     )
     payload = decode_body(route.calls[0])
-    assert payload["worklog"]["time_spent"] == 90
-    assert isinstance(payload["worklog"]["time_spent"], int)
-
-
-@respx.mock
-async def test_add_worklog_with_technician() -> None:
-    route = respx.post(f"{BASE}/requests/8/worklogs").mock(
-        return_value=httpx.Response(200, json={"worklog": {"id": "2"}})
-    )
-    await get_tool("add_request_worklog").fn(
-        request_id="8", description="Work done", hours=0.5, technician="jdoe"
-    )
-    payload = decode_body(route.calls[0])
-    assert payload["worklog"]["technician"] == {"name": "jdoe"}
-
-
-@respx.mock
-async def test_add_worklog_without_technician_omits_key() -> None:
-    route = respx.post(f"{BASE}/requests/8/worklogs").mock(
-        return_value=httpx.Response(200, json={"worklog": {"id": "3"}})
-    )
-    await get_tool("add_request_worklog").fn(
-        request_id="8", description="Work done"
-    )
-    payload = decode_body(route.calls[0])
-    assert "technician" not in payload["worklog"]
+    assert payload["worklog"]["time_spent"] == {"hours": 1, "minutes": 30}
+    assert payload["worklog"]["owner"] == {"email_id": "jdoe@example.com"}
 
 
 @respx.mock

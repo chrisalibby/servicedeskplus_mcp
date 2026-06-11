@@ -13,20 +13,17 @@ def register(app: FastMCP) -> None:
     async def list_configuration_items(
         page: Annotated[int, "Page number (1-based)"] = 1,
         page_size: Annotated[int, "Results per page (max 100)"] = 25,
-        ci_type: Annotated[str, "Filter by CI type name"] = "",
+        module_type: Annotated[str, "Filter by module api_plural_name, e.g. 'cmdb_itservice', 'cmdb_departmentci', 'cmdb_people', 'cmdb_supportgroup', 'cmdb_switchportci'"] = "",
     ) -> dict[str, Any]:
-        """List CMDB configuration items."""
+        """List CMDB configuration items. Each item includes a 'module' field identifying its type."""
         list_info: dict[str, Any] = {
             "start_index": (page - 1) * page_size,
             "row_count": page_size,
         }
-        if ci_type:
-            list_info["search_criteria"] = [
-                {"field": "ci_type.name", "condition": "is", "value": ci_type}
-            ]
         params = {"input_data": json.dumps({"list_info": list_info})}
+        path = f"/{module_type}" if module_type else "/cmdb"
         async with get_client() as c:
-            return await c.get("/ci", params=params)
+            return await c.get(path, params=params)
 
     @app.tool()
     async def get_configuration_item(
@@ -34,7 +31,7 @@ def register(app: FastMCP) -> None:
     ) -> dict[str, Any]:
         """Get a single configuration item by ID."""
         async with get_client() as c:
-            return await c.get(f"/ci/{ci_id}")
+            return await c.get(f"/cmdb/{ci_id}")
 
     @app.tool()
     async def create_configuration_item(
@@ -53,7 +50,7 @@ def register(app: FastMCP) -> None:
         if state:
             ci["state"] = {"name": state}
         async with get_client() as c:
-            return await c.post("/ci", {"ci": ci})
+            return await c.post("/cmdb", {"ci": ci})
 
     @app.tool()
     async def update_configuration_item(

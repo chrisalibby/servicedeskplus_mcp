@@ -1,6 +1,7 @@
 """Service request tools for ServiceDesk Plus."""
 
 import json
+from datetime import datetime, timezone
 from typing import Annotated, Any
 
 from mcp.server.fastmcp import FastMCP
@@ -8,15 +9,24 @@ from mcp.server.fastmcp import FastMCP
 from ..client import get_client
 
 
+def _date_to_epoch_ms(date_str: str) -> str:
+    """Convert YYYY-MM-DD to epoch milliseconds string (UTC midnight)."""
+    dt = datetime.fromisoformat(date_str).replace(tzinfo=timezone.utc)
+    return str(int(dt.timestamp() * 1000))
+
+
 def register(app: FastMCP) -> None:
     @app.tool()
     async def list_requests(
         page: Annotated[int, "Page number (1-based)"] = 1,
         page_size: Annotated[int, "Results per page (max 100)"] = 25,
-        status: Annotated[str, "Filter by status name, e.g. 'Open'"] = "",
-        technician: Annotated[str, "Filter by technician login name"] = "",
+        status: Annotated[str, "Filter by status name, e.g. 'Open'. Cannot combine with date filters."] = "",
+        technician: Annotated[str, "Filter by technician login name. Cannot combine with date filters."] = "",
+        opened_after: Annotated[str, "Return tickets created after this date (YYYY-MM-DD). Cannot combine with other filters."] = "",
+        opened_before: Annotated[str, "Return tickets created before this date (YYYY-MM-DD). Cannot combine with other filters."] = "",
+        due_before: Annotated[str, "Return tickets due before this date (YYYY-MM-DD). Cannot combine with other filters."] = "",
     ) -> dict[str, Any]:
-        """List service requests with optional filtering."""
+        """List service requests with optional filtering. Note: date filters (opened_after, opened_before, due_before) cannot be combined with status or technician filters on this instance."""
         list_info: dict[str, Any] = {
             "start_index": (page - 1) * page_size,
             "row_count": page_size,
@@ -26,6 +36,15 @@ def register(app: FastMCP) -> None:
             filters.append({"field": "status.name", "condition": "is", "value": status})
         if technician:
             filters.append({"field": "technician.name", "condition": "is", "value": technician})
+        if opened_after:
+            ms = _date_to_epoch_ms(opened_after)
+            filters.append({"field": "created_time", "condition": "gt", "value": ms})
+        if opened_before:
+            ms = _date_to_epoch_ms(opened_before)
+            filters.append({"field": "created_time", "condition": "lt", "value": ms})
+        if due_before:
+            ms = _date_to_epoch_ms(due_before)
+            filters.append({"field": "due_by_time", "condition": "lt", "value": ms})
         if filters:
             list_info["search_criteria"] = filters
         params = {"input_data": json.dumps({"list_info": list_info})}
@@ -177,16 +196,16 @@ def register(app: FastMCP) -> None:
     async def add_request_worklog(
         request_id: Annotated[str, "Request ID"],
         description: Annotated[str, "Work performed"],
-        hours: Annotated[float, "Hours spent (decimal)"] = 0.0,
-        technician: Annotated[str, "Technician login name"] = "",
+        technician_email: Annotated[str, "Technician email address (e.g. jsmith@spero.financial)"],
+        hours: Annotated[int, "Whole hours spent"] = 0,
+        minutes: Annotated[int, "Additional minutes spent (0–59)"] = 0,
     ) -> dict[str, Any]:
         """Add a worklog entry to a service request."""
         worklog: dict[str, Any] = {
             "description": description,
-            "time_spent": int(hours * 60),
+            "time_spent": {"hours": hours, "minutes": minutes},
+            "owner": {"email_id": technician_email},
         }
-        if technician:
-            worklog["technician"] = {"name": technician}
         async with get_client() as c:
             return await c.post(f"/requests/{request_id}/worklogs", {"worklog": worklog})
 

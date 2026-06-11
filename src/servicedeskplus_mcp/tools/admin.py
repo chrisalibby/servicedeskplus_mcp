@@ -76,6 +76,14 @@ def register(app: FastMCP) -> None:
         return await _paged_list("/categories", page, page_size)
 
     @app.tool()
+    async def list_subcategories(
+        page: Annotated[int, "Page number (1-based)"] = 1,
+        page_size: Annotated[int, "Results per page (max 100)"] = 100,
+    ) -> dict[str, Any]:
+        """List all request subcategories (includes parent category name)."""
+        return await _paged_list("/subcategories", page, page_size)
+
+    @app.tool()
     async def list_priorities(
         page: Annotated[int, "Page number (1-based)"] = 1,
         page_size: Annotated[int, "Results per page (max 100)"] = 25,

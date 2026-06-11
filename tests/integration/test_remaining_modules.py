@@ -44,11 +44,23 @@ async def test_list_changes(client) -> None:
 
 async def test_list_configuration_items(client) -> None:
     params = {"input_data": json.dumps({"list_info": {"start_index": 0, "row_count": 5}})}
-    result = await client.get("/ci", params=params)
-    if "error" in result:
-        pytest.skip(f"CMDB (/ci) not available on this instance: {result['error']}")
+    result = await client.get("/cmdb", params=params)
     assert "error" not in result, result.get("error")
-    print(f"\nCIs (first 5): {len(result.get('ci', []))}")
+    cis = result.get("cmdb", [])
+    print(f"\nCIs (first 5): {len(cis)}")
+    for ci in cis:
+        print(f"  {ci.get('id')} [{ci.get('module', {}).get('display_name')}] — {ci.get('name')}")
+
+    # Verify get-by-id works
+    if cis:
+        single = await client.get(f"/cmdb/{cis[0]['id']}")
+        assert "cmdb" in single, single
+        assert single["cmdb"]["id"] == cis[0]["id"]
+
+    # Verify module-type filter works
+    result2 = await client.get("/cmdb_itservice", params=params)
+    assert "error" not in result2, result2.get("error")
+    print(f"  cmdb_itservice count: {len(result2.get('cmdb_itservice', []))}")
 
 
 # ---------------------------------------------------------------------------

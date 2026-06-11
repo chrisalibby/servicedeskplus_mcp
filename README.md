@@ -115,7 +115,7 @@ Add to your project or global `.claude/settings.json`:
 
 | Tool | Description |
 |---|---|
-| `list_requests` | List requests with optional status/technician filters and pagination |
+| `list_requests` | List requests with optional status/technician/date filters and pagination |
 | `get_request` | Get a single request by ID |
 | `create_request` | Create a new service request (supports subcategory) |
 | `update_request` | Update fields on an existing request |
@@ -125,7 +125,7 @@ Add to your project or global `.claude/settings.json`:
 | `pickup_request` | Pick up a request (assign to the API key owner) |
 | `add_request_note` | Add a public or private note |
 | `list_request_notes` | List all notes on a request |
-| `add_request_worklog` | Log time worked on a request |
+| `add_request_worklog` | Log time worked on a request (requires `technician_email`) |
 | `list_request_worklogs` | List all worklog entries |
 | `get_request_resolution` | Get the current resolution |
 | `update_request_resolution` | Set or update the resolution |
@@ -173,7 +173,7 @@ Add to your project or global `.claude/settings.json`:
 
 | Tool | Description |
 |---|---|
-| `list_configuration_items` | List CIs with optional type filter |
+| `list_configuration_items` | List CIs; filter by `module_type` (e.g. `cmdb_itservice`) |
 | `get_configuration_item` | Get a single CI by ID |
 | `create_configuration_item` | Create a new CI |
 | `update_configuration_item` | Update an existing CI |
@@ -200,6 +200,7 @@ Add to your project or global `.claude/settings.json`:
 | `list_groups` | List technician groups |
 | `list_sites` | List all sites |
 | `list_categories` | List request categories |
+| `list_subcategories` | List all subcategories (includes parent category) |
 | `list_priorities` | List priority levels |
 | `list_statuses` | List request statuses |
 | `list_urgencies` | List urgency levels |
@@ -251,19 +252,18 @@ These were discovered during integration testing against a real on-prem instance
 
 | Area | Status | Notes |
 |---|---|---|
-| Worklogs | Broken | `POST /requests/{id}/worklogs` rejects all field formats with 400. Time entry is enabled in SDP Admin but the API contract is unclear. To debug: open a ticket, add a time entry in the UI, capture the request in browser DevTools. |
-| Groups (`list_groups`) | May 404 | `/groups` endpoint returns 404 or 400 on some instances. |
-| CMDB (`list_configuration_items`) | May be unavailable | `/ci` returns 400/404 on instances without CMDB licensed or enabled. |
+| Groups (`list_groups`) | May 404 | `/groups` returns 404 or 400 on some instances. |
+| CMDB create/update | Not supported | `POST /cmdb` and relationships return 404. List and get-by-ID work. |
+| `close_change` | Instance-dependent | Changes may require workflow progression (Requested → Approved → Completed). Direct status PUT is rejected on some instances. |
 | Closure codes | Optional | `close_request` works without a closure code; include one only if your instance requires it. |
 | `delete_request` | Trash only | Moves to SDP Trash (recoverable). There is no permanently-delete tool. |
+| Date filters | Cannot combine | `opened_after`/`opened_before`/`due_before` on `list_requests` cannot be combined with `status` or `technician` filters on some instances. |
 
 ## Roadmap
 
-- **Resolve worklog API** — capture browser network traffic to determine correct field format for on-prem v14
 - **Cloud / OAuth2 support** — SDP Cloud uses OAuth2; planned as next major feature
 - **Attachments** — upload and download file attachments on requests, problems, and changes
 - **Bulk operations** — batch-update multiple records in a single tool call
-- **Date range filters** — `list_requests` filtered by open date, due date, etc.
 
 ## License
 
