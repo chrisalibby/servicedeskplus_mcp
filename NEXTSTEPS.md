@@ -99,4 +99,24 @@ pytest tests/integration/ -m integration -v
 
 ## Recommended next work
 
-1. **Claude Desktop / Claude Code setup at Spero** — see `SETUP.md` for the per-technician configuration guide. Each technician generates their own SDP API key and adds the server to their local Claude Desktop config.
+### Immediate (before team rollout)
+
+1. **Distribute `SETUP.md`** — send to each technician. They follow the guide independently; each generates their own SDP API key so actions are attributed correctly in audit logs.
+
+2. **Clean up SDP debug records** — two records were created during development and left open:
+   - Change **#89** ("[DEBUG] change probe") — close or delete via SDP UI
+   - Worklog on request **#47202** (description: "probe") — delete via the worklog section on that ticket
+
+### If issues come up during rollout
+
+- **"Cannot connect to SDP"** — technician is not on VPN or on-site. `sdp.example.com` is not externally accessible.
+- **"Invalid API key"** — technician needs to regenerate in SDP → My Profile → API Key.
+- **`sdp-mcp` not found** — Python Scripts folder not on PATH. Full path workaround is in `SETUP.md`.
+- **Claude Desktop shows no tools** — restart Claude Desktop after saving the config file.
+
+### Future development (not urgent)
+
+- **Cloud / OAuth2 support** — SDP Cloud uses OAuth2 instead of API key auth; planned if Spero ever migrates to cloud.
+- **Attachments** — upload/download files on requests, problems, and changes.
+- **Bulk operations** — batch-update multiple tickets in one tool call (e.g. bulk-assign, bulk-close).
+- **Change workflow progression** — `close_change` currently blocked by SDP's workflow enforcement. Would need tooling to advance through stages (Requested → In Review → Approved → In Progress → Completed) rather than jumping directly to a terminal state.
