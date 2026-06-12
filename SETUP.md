@@ -1,7 +1,11 @@
 # Technician Setup Guide — ServiceDesk Plus MCP
 
-This guide gets the SDP MCP server running in Claude Desktop at Spero Financial.
-Each technician follows these steps once and uses their own API key.
+This guide covers two deployment options:
+
+- **Local install** — each technician installs the server on their own machine (Steps 1–6 below)
+- **Shared server** — an admin runs one central instance; technicians only need to configure Claude Desktop ([jump to Shared Server Setup](#shared-server-setup))
+
+Both options preserve per-user API keys so activity in ServiceDesk Plus is attributed correctly.
 
 ---
 
@@ -136,6 +140,139 @@ Claude should call the `list_requests` tool and return your open tickets. If you
 | `Invalid API key` | Regenerate your key in SDP → My Profile |
 | `SSL certificate error` | Confirm `SDP_VERIFY_SSL=false` is set |
 | Claude Desktop shows no tools | Restart Claude Desktop after saving the config |
+
+---
+
+## Shared Server Setup
+
+This option runs one instance of the MCP server on an internal host. Technicians point Claude
+Desktop at a URL instead of running a local command — no Python, no cloning, nothing to install
+on their machines.
+
+### Admin: server-side setup
+
+**1. Install on the server**
+
+Follow Steps 1–2 of the local install on the server host (clone the repo, `pip install -e .`).
+
+**2. Create the server `.env`**
+
+```dotenv
+SDP_SERVER=sdp.example.com
+SDP_PORT=443
+SDP_VERIFY_SSL=false
+SDP_TIMEOUT=30
+SDP_TRANSPORT=http
+SDP_HTTP_HOST=127.0.0.1
+SDP_HTTP_PORT=8000
+SDP_TRUST_PROXY=true
+```
+
+`SDP_API_KEY` is intentionally omitted — each user supplies their own via Claude Desktop.
+
+**3. Run the server**
+
+For a quick test:
+
+```sh
+sdp-mcp
+```
+
+For a persistent background process (Linux/Mac):
+
+```sh
+nohup sdp-mcp >> /var/log/sdp-mcp.log 2>&1 &
+```
+
+Or use a systemd unit file (`/etc/systemd/system/sdp-mcp.service`):
+
+```ini
+[Unit]
+Description=ServiceDesk Plus MCP Server
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/sdp-mcp
+WorkingDirectory=/opt/servicedeskplus_mcp
+EnvironmentFile=/opt/servicedeskplus_mcp/.env
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start: `systemctl enable --now sdp-mcp`
+
+**4. Configure a reverse proxy (required for HTTPS)**
+
+The server binds to `127.0.0.1:8000` only — do **not** expose this port externally. Put Caddy or
+nginx in front to handle TLS.
+
+> **Caddy** (`/etc/caddy/Caddyfile`):
+>
+> ```
+> mcp.yourdomain.local {
+>     reverse_proxy 127.0.0.1:8000
+> }
+> ```
+>
+> Caddy provisions TLS automatically and passes the required forwarding headers.
+
+> **nginx** (`/etc/nginx/sites-available/sdp-mcp`):
+>
+> ```nginx
+> server {
+>     listen 443 ssl;
+>     server_name mcp.yourdomain.local;
+>     ssl_certificate     /path/to/cert.pem;
+>     ssl_certificate_key /path/to/key.pem;
+>
+>     location / {
+>         proxy_pass         http://127.0.0.1:8000;
+>         proxy_set_header   Host $host;
+>         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+>         proxy_set_header   X-Forwarded-Proto $scheme;
+>         proxy_buffering    off;
+>         proxy_read_timeout 3600s;
+>     }
+> }
+> ```
+>
+> `proxy_buffering off` and the extended `proxy_read_timeout` are required — MCP uses long-lived
+> streaming connections that will stall under nginx's default buffering settings.
+
+Reload your proxy after saving the config.
+
+---
+
+### Technician: Claude Desktop config
+
+Each technician gets their SDP API key (Step 3 of the local install guide) and adds this to their
+Claude Desktop config instead of the local-command version:
+
+**Config file location:**
+
+- Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "servicedeskplus": {
+      "url": "https://mcp.yourdomain.local/mcp",
+      "headers": {
+        "X-SDP-Api-Key": "<paste your key here>"
+      }
+    }
+  }
+}
+```
+
+Replace the URL with your actual server hostname, and `<paste your key here>` with your SDP API
+key. Save the file and restart Claude Desktop.
+
+> **Network requirement:** Claude Desktop must be able to reach the server. If it is hosted on the
+> Spero internal network, you must be on-site or connected to VPN.
 
 ---
 

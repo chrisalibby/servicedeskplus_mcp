@@ -1,12 +1,15 @@
 """Async httpx client wrapper for ServiceDesk Plus API v3."""
 
 import json
+from contextvars import ContextVar
 from typing import Any, cast
 
 import httpx
 
 from .auth import get_headers
 from .config import settings
+
+request_api_key: ContextVar[str] = ContextVar("sdp_api_key", default="")
 
 
 def _sdp_error(resp: httpx.Response) -> dict[str, Any]:
@@ -31,7 +34,8 @@ def _sdp_error(resp: httpx.Response) -> dict[str, Any]:
 
 class SDPClient:
     def __init__(self) -> None:
-        self._headers = get_headers(settings.SDP_API_KEY)
+        api_key = request_api_key.get() or settings.SDP_API_KEY
+        self._headers = get_headers(api_key)
         self._client = httpx.AsyncClient(
             base_url=settings.base_url,
             headers=self._headers,

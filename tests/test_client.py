@@ -6,7 +6,7 @@ from urllib.parse import parse_qs
 import httpx
 import respx
 
-from servicedeskplus_mcp.client import get_client
+from servicedeskplus_mcp.client import request_api_key, get_client
 
 
 @respx.mock
@@ -114,3 +114,31 @@ async def test_connect_error_returns_error_dict() -> None:
         result = await c.get("/requests")
     assert "error" in result
     assert "connect" in result["error"].lower()
+
+
+@respx.mock
+async def test_context_var_overrides_settings_api_key() -> None:
+    route = respx.get("http://sdp.test.local:8080/api/v3/requests").mock(
+        return_value=httpx.Response(200, json={})
+    )
+    token = request_api_key.set("per-connection-key")
+    try:
+        async with get_client() as c:
+            await c.get("/requests")
+    finally:
+        request_api_key.reset(token)
+    assert route.calls[0].request.headers["Authtoken"] == "per-connection-key"
+
+
+@respx.mock
+async def test_falls_back_to_settings_when_context_var_empty() -> None:
+    route = respx.get("http://sdp.test.local:8080/api/v3/requests").mock(
+        return_value=httpx.Response(200, json={})
+    )
+    token = request_api_key.set("")
+    try:
+        async with get_client() as c:
+            await c.get("/requests")
+    finally:
+        request_api_key.reset(token)
+    assert route.calls[0].request.headers["Authtoken"] == "test-api-key"

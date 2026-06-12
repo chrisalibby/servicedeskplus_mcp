@@ -10,11 +10,14 @@ class Settings(BaseSettings):
 
     SDP_SERVER: str = "localhost"
     SDP_PORT: int = 8080
-    SDP_API_KEY: str
+    SDP_API_KEY: str = ""
     SDP_PORTAL_ID: str = ""
     SDP_TIMEOUT: float = 30.0
-    # Set to false for internal servers with self-signed certificates
     SDP_VERIFY_SSL: bool = True
+    SDP_TRANSPORT: str = "stdio"
+    SDP_HTTP_HOST: str = "127.0.0.1"
+    SDP_HTTP_PORT: int = 8000
+    SDP_TRUST_PROXY: bool = False
 
     @property
     def scheme(self) -> str:
