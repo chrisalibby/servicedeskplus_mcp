@@ -2,8 +2,6 @@
 
 from typing import Any
 
-import pytest
-
 from servicedeskplus_mcp.client import request_api_key
 from servicedeskplus_mcp.server import _ApiKeyMiddleware
 

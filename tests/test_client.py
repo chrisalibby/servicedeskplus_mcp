@@ -6,7 +6,7 @@ from urllib.parse import parse_qs
 import httpx
 import respx
 
-from servicedeskplus_mcp.client import request_api_key, get_client
+from servicedeskplus_mcp.client import get_client, request_api_key
 
 
 @respx.mock
@@ -114,6 +114,53 @@ async def test_connect_error_returns_error_dict() -> None:
         result = await c.get("/requests")
     assert "error" in result
     assert "connect" in result["error"].lower()
+
+
+@respx.mock
+async def test_get_retries_on_timeout_then_succeeds() -> None:
+    route = respx.get("http://sdp.test.local:8080/api/v3/requests")
+    route.side_effect = [
+        httpx.ReadTimeout("timed out"),
+        httpx.Response(200, json={"requests": []}),
+    ]
+    async with get_client() as c:
+        result = await c.get("/requests")
+    assert route.call_count == 2
+    assert result == {"requests": []}
+
+
+@respx.mock
+async def test_get_gives_up_after_retries() -> None:
+    route = respx.get("http://sdp.test.local:8080/api/v3/requests").mock(
+        side_effect=httpx.ReadTimeout("timed out")
+    )
+    async with get_client() as c:
+        result = await c.get("/requests")
+    assert route.call_count == 3
+    assert "error" in result
+    assert "indeterminate" not in result
+
+
+@respx.mock
+async def test_post_timeout_returns_indeterminate() -> None:
+    route = respx.post("http://sdp.test.local:8080/api/v3/requests").mock(
+        side_effect=httpx.ReadTimeout("timed out")
+    )
+    async with get_client() as c:
+        result = await c.post("/requests", {"request": {"subject": "x"}})
+    assert route.call_count == 1
+    assert result["indeterminate"] is True
+    assert "verify before retrying" in result["message"]
+
+
+@respx.mock
+async def test_put_timeout_returns_indeterminate() -> None:
+    respx.put("http://sdp.test.local:8080/api/v3/requests/1").mock(
+        side_effect=httpx.ReadTimeout("timed out")
+    )
+    async with get_client() as c:
+        result = await c.put("/requests/1", {"request": {}})
+    assert result["indeterminate"] is True
 
 
 @respx.mock

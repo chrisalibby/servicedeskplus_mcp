@@ -13,9 +13,13 @@ def register(app: FastMCP) -> None:
     async def list_configuration_items(
         page: Annotated[int, "Page number (1-based)"] = 1,
         page_size: Annotated[int, "Results per page (max 100)"] = 25,
-        module_type: Annotated[str, "Filter by module api_plural_name, e.g. 'cmdb_itservice', 'cmdb_departmentci', 'cmdb_people', 'cmdb_supportgroup', 'cmdb_switchportci'"] = "",
+        module_type: Annotated[
+            str,
+            "Filter by module api_plural_name, e.g. 'cmdb_itservice', 'cmdb_departmentci', "
+            "'cmdb_people', 'cmdb_supportgroup', 'cmdb_switchportci'",
+        ] = "",
     ) -> dict[str, Any]:
-        """List CMDB configuration items. Each item includes a 'module' field identifying its type."""
+        """List CMDB configuration items. Each item includes a 'module' field identifying its type."""  # noqa: E501
         list_info: dict[str, Any] = {
             "start_index": (page - 1) * page_size,
             "row_count": page_size,

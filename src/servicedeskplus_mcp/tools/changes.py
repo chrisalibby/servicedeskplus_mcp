@@ -6,6 +6,7 @@ from typing import Annotated, Any
 from mcp.server.fastmcp import FastMCP
 
 from ..client import get_client
+from ._util import strip_cdata
 
 
 def register(app: FastMCP) -> None:
@@ -14,12 +15,18 @@ def register(app: FastMCP) -> None:
         page: Annotated[int, "Page number (1-based)"] = 1,
         page_size: Annotated[int, "Results per page (max 100)"] = 25,
         status: Annotated[str, "Filter by status name"] = "",
+        sort_field: Annotated[str, "Field to sort by"] = "created_time",
+        sort_order: Annotated[str, "Sort order: 'asc' or 'desc'"] = "desc",
     ) -> dict[str, Any]:
-        """List change records with optional filtering."""
+        """List change records with optional filtering. Sorted newest-first by default."""
         list_info: dict[str, Any] = {
             "start_index": (page - 1) * page_size,
             "row_count": page_size,
         }
+        if sort_field:
+            list_info["sort_field"] = sort_field
+        if sort_order:
+            list_info["sort_order"] = sort_order
         if status:
             list_info["search_criteria"] = [
                 {"field": "status.name", "condition": "is", "value": status}
@@ -39,7 +46,9 @@ def register(app: FastMCP) -> None:
     @app.tool()
     async def create_change(
         title: Annotated[str, "Change title"],
-        description: Annotated[str, "Change description"] = "",
+        description: Annotated[
+            str, "Change description. Raw HTML is supported; do not wrap in CDATA."
+        ] = "",
         change_type: Annotated[str, "Change type, e.g. 'Standard', 'Emergency'"] = "",
         priority: Annotated[str, "Priority name"] = "",
         technician: Annotated[str, "Assigned technician login name"] = "",
@@ -49,7 +58,7 @@ def register(app: FastMCP) -> None:
         """Create a new change record."""
         change: dict[str, Any] = {"title": title}
         if description:
-            change["description"] = description
+            change["description"] = strip_cdata(description)
         if change_type:
             change["change_type"] = {"name": change_type}
         if priority:
@@ -67,7 +76,9 @@ def register(app: FastMCP) -> None:
     async def update_change(
         change_id: Annotated[str, "Change ID"],
         title: Annotated[str, "Updated title"] = "",
-        description: Annotated[str, "Updated description"] = "",
+        description: Annotated[
+            str, "Updated description. Raw HTML is supported; do not wrap in CDATA."
+        ] = "",
         status: Annotated[str, "New status name"] = "",
         priority: Annotated[str, "New priority name"] = "",
         technician: Annotated[str, "New assigned technician login name"] = "",
@@ -77,7 +88,7 @@ def register(app: FastMCP) -> None:
         if title:
             change["title"] = title
         if description:
-            change["description"] = description
+            change["description"] = strip_cdata(description)
         if status:
             change["status"] = {"name": status}
         if priority:
@@ -102,11 +113,13 @@ def register(app: FastMCP) -> None:
     @app.tool()
     async def add_change_note(
         change_id: Annotated[str, "Change ID"],
-        note_text: Annotated[str, "Note content"],
+        note_text: Annotated[str, "Note content. Raw HTML is supported; do not wrap in CDATA."],
     ) -> dict[str, Any]:
         """Add a note to a change record."""
         async with get_client() as c:
-            return await c.post(f"/changes/{change_id}/notes", {"note": {"description": note_text}})
+            return await c.post(
+                f"/changes/{change_id}/notes", {"note": {"description": strip_cdata(note_text)}}
+            )
 
     @app.tool()
     async def list_change_tasks(

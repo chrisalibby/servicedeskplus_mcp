@@ -5,7 +5,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from .client import request_api_key
-from .tools import admin, assets, changes, cmdb, problems, requests, solutions
+from .tools import admin, assets, changes, cmdb, contracts, problems, requests, solutions
 
 mcp = FastMCP("ServiceDesk Plus")
 
@@ -14,6 +14,7 @@ problems.register(mcp)
 changes.register(mcp)
 assets.register(mcp)
 cmdb.register(mcp)
+contracts.register(mcp)
 solutions.register(mcp)
 admin.register(mcp)
 

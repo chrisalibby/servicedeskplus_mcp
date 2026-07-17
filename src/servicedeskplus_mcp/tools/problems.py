@@ -6,6 +6,7 @@ from typing import Annotated, Any
 from mcp.server.fastmcp import FastMCP
 
 from ..client import get_client
+from ._util import strip_cdata
 
 
 def register(app: FastMCP) -> None:
@@ -39,14 +40,16 @@ def register(app: FastMCP) -> None:
     @app.tool()
     async def create_problem(
         title: Annotated[str, "Problem title"],
-        description: Annotated[str, "Problem description"] = "",
+        description: Annotated[
+            str, "Problem description. Raw HTML is supported; do not wrap in CDATA."
+        ] = "",
         priority: Annotated[str, "Priority name"] = "",
         technician: Annotated[str, "Assigned technician login name"] = "",
     ) -> dict[str, Any]:
         """Create a new problem record."""
         problem: dict[str, Any] = {"title": title}
         if description:
-            problem["description"] = description
+            problem["description"] = strip_cdata(description)
         if priority:
             problem["priority"] = {"name": priority}
         if technician:
@@ -58,7 +61,9 @@ def register(app: FastMCP) -> None:
     async def update_problem(
         problem_id: Annotated[str, "Problem ID"],
         title: Annotated[str, "Updated title"] = "",
-        description: Annotated[str, "Updated description"] = "",
+        description: Annotated[
+            str, "Updated description. Raw HTML is supported; do not wrap in CDATA."
+        ] = "",
         status: Annotated[str, "New status name"] = "",
         priority: Annotated[str, "New priority name"] = "",
         technician: Annotated[str, "New assigned technician login name"] = "",
@@ -68,7 +73,7 @@ def register(app: FastMCP) -> None:
         if title:
             problem["title"] = title
         if description:
-            problem["description"] = description
+            problem["description"] = strip_cdata(description)
         if status:
             problem["status"] = {"name": status}
         if priority:
@@ -93,8 +98,10 @@ def register(app: FastMCP) -> None:
     @app.tool()
     async def add_problem_note(
         problem_id: Annotated[str, "Problem ID"],
-        note_text: Annotated[str, "Note content"],
+        note_text: Annotated[str, "Note content. Raw HTML is supported; do not wrap in CDATA."],
     ) -> dict[str, Any]:
         """Add a note to a problem record."""
         async with get_client() as c:
-            return await c.post(f"/problems/{problem_id}/notes", {"note": {"description": note_text}})
+            return await c.post(
+                f"/problems/{problem_id}/notes", {"note": {"description": strip_cdata(note_text)}}
+            )

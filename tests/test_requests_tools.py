@@ -106,6 +106,28 @@ async def test_list_requests_opened_before() -> None:
 
 
 @respx.mock
+async def test_list_requests_subject_search() -> None:
+    route = respx.get(f"{BASE}/requests").mock(
+        return_value=httpx.Response(200, json={"requests": []})
+    )
+    await get_tool("list_requests").fn(search="VPN")
+    params = decode_get_params(route.calls[0])
+    criteria = params["list_info"]["search_criteria"]
+    assert criteria[0] == {"field": "subject", "condition": "contains", "value": "VPN"}
+
+
+@respx.mock
+async def test_list_requests_sort_params() -> None:
+    route = respx.get(f"{BASE}/requests").mock(
+        return_value=httpx.Response(200, json={"requests": []})
+    )
+    await get_tool("list_requests").fn(sort_field="created_time", sort_order="desc")
+    params = decode_get_params(route.calls[0])
+    assert params["list_info"]["sort_field"] == "created_time"
+    assert params["list_info"]["sort_order"] == "desc"
+
+
+@respx.mock
 async def test_list_requests_due_before() -> None:
     route = respx.get(f"{BASE}/requests").mock(
         return_value=httpx.Response(200, json={"requests": []})
@@ -129,6 +151,24 @@ async def test_get_request_url() -> None:
     result = await get_tool("get_request").fn(request_id="42")
     assert route.called
     assert result["request"]["id"] == "42"
+
+
+@respx.mock
+async def test_get_request_normalizes_prefixed_id() -> None:
+    route = respx.get(f"{BASE}/requests/42").mock(
+        return_value=httpx.Response(200, json={"request": {"id": "42"}})
+    )
+    await get_tool("get_request").fn(request_id="RE-42")
+    assert route.called
+
+
+@respx.mock
+async def test_get_request_normalizes_hash_prefix() -> None:
+    route = respx.get(f"{BASE}/requests/42").mock(
+        return_value=httpx.Response(200, json={"request": {"id": "42"}})
+    )
+    await get_tool("get_request").fn(request_id="#42")
+    assert route.called
 
 
 # ---------------------------------------------------------------------------
@@ -162,6 +202,9 @@ async def test_create_request_omits_empty_optionals() -> None:
 
 @respx.mock
 async def test_create_request_all_fields() -> None:
+    respx.get(f"{BASE}/urgencies").mock(
+        return_value=httpx.Response(200, json={"urgencies": [{"id": "3", "name": "High"}]})
+    )
     route = respx.post(f"{BASE}/requests").mock(
         return_value=httpx.Response(200, json={"request": {"id": "2"}})
     )
@@ -182,10 +225,45 @@ async def test_create_request_all_fields() -> None:
     assert req["requester"] == {"name": "jsmith"}
     assert req["category"] == {"name": "Network"}
     assert req["priority"] == {"name": "High"}
-    assert req["urgency"] == {"name": "High"}
+    assert req["urgency"] == {"id": "3"}
     assert req["site"] == {"name": "HQ"}
     assert req["group"] == {"name": "Network Team"}
     assert req["technician"] == {"name": "jdoe"}
+
+
+@respx.mock
+async def test_create_request_urgency_numeric_id_skips_lookup() -> None:
+    route = respx.post(f"{BASE}/requests").mock(
+        return_value=httpx.Response(200, json={"request": {"id": "3"}})
+    )
+    await get_tool("create_request").fn(subject="Test", urgency="4")
+    payload = decode_body(route.calls[0])
+    assert payload["request"]["urgency"] == {"id": "4"}
+
+
+@respx.mock
+async def test_create_request_unresolvable_urgency_returns_error() -> None:
+    respx.get(f"{BASE}/urgencies").mock(
+        return_value=httpx.Response(200, json={"urgencies": [{"id": "1", "name": "Low"}]})
+    )
+    post_route = respx.post(f"{BASE}/requests").mock(
+        return_value=httpx.Response(200, json={"request": {"id": "4"}})
+    )
+    result = await get_tool("create_request").fn(subject="Test", urgency="Bogus")
+    assert "error" in result
+    assert not post_route.called
+
+
+@respx.mock
+async def test_create_request_strips_cdata() -> None:
+    route = respx.post(f"{BASE}/requests").mock(
+        return_value=httpx.Response(200, json={"request": {"id": "5"}})
+    )
+    await get_tool("create_request").fn(
+        subject="Test", description="<![CDATA[<b>bold</b>]]>"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["request"]["description"] == "<b>bold</b>"
 
 
 # ---------------------------------------------------------------------------
@@ -345,6 +423,61 @@ async def test_add_request_note_public() -> None:
     )
     payload = decode_body(route.calls[0])
     assert payload["note"]["show_to_requester"] is True
+
+
+@respx.mock
+async def test_add_request_note_indeterminate_verify_found() -> None:
+    respx.post(f"{BASE}/requests/8/notes").mock(
+        side_effect=httpx.ReadTimeout("timed out")
+    )
+    respx.get(f"{BASE}/requests/8/notes").mock(
+        return_value=httpx.Response(200, json={
+            "notes": [{"id": "1", "description": "Investigating the outage"}]
+        })
+    )
+    result = await get_tool("add_request_note").fn(
+        request_id="8", note_text="Investigating the outage"
+    )
+    assert result["indeterminate"] is True
+    assert result["posted"] is True
+
+
+@respx.mock
+async def test_add_request_note_indeterminate_verify_not_found() -> None:
+    respx.post(f"{BASE}/requests/8/notes").mock(
+        side_effect=httpx.ReadTimeout("timed out")
+    )
+    respx.get(f"{BASE}/requests/8/notes").mock(
+        return_value=httpx.Response(200, json={"notes": []})
+    )
+    result = await get_tool("add_request_note").fn(request_id="8", note_text="Lost note")
+    assert result["indeterminate"] is True
+    assert result["posted"] is False
+
+
+@respx.mock
+async def test_add_request_note_indeterminate_verify_fails() -> None:
+    respx.post(f"{BASE}/requests/8/notes").mock(
+        side_effect=httpx.ReadTimeout("timed out")
+    )
+    respx.get(f"{BASE}/requests/8/notes").mock(
+        side_effect=httpx.ReadTimeout("timed out")
+    )
+    result = await get_tool("add_request_note").fn(request_id="8", note_text="Unknown")
+    assert result["indeterminate"] is True
+    assert result["posted"] == "unknown"
+
+
+@respx.mock
+async def test_add_request_note_strips_cdata() -> None:
+    route = respx.post(f"{BASE}/requests/8/notes").mock(
+        return_value=httpx.Response(200, json={"note": {"id": "3"}})
+    )
+    await get_tool("add_request_note").fn(
+        request_id="8", note_text="<![CDATA[<p>hello</p>]]>"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["note"]["description"] == "<p>hello</p>"
 
 
 @respx.mock

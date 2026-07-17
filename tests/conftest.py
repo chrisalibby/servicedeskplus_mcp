@@ -36,6 +36,12 @@ def get_tool(name: str) -> Any:
     return next(t for t in tools if t.name == name)
 
 
+@pytest.fixture(autouse=True)
+def _fast_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Skip retry backoff sleeps in unit tests."""
+    monkeypatch.setattr("servicedeskplus_mcp.client._RETRY_BACKOFF", 0.0)
+
+
 @pytest.fixture
 def sdp_mock() -> Any:
     """Active respx router that intercepts all httpx requests."""
