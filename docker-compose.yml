@@ -1,0 +1,13 @@
+services:
+  sdp-mcp:
+    build: .
+    image: servicedeskplus-mcp:latest
+    ports:
+      - "8000:8000"
+    environment:
+      SDP_SERVER: sdp.example.com
+      SDP_PORT: "443"
+      SDP_VERIFY_SSL: "false"
+      SDP_TIMEOUT: "60"
+      # No SDP_API_KEY — each client sends X-SDP-API-Key
+    restart: unless-stopped
