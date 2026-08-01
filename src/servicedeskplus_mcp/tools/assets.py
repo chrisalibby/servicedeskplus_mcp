@@ -19,6 +19,7 @@ def register(app: FastMCP) -> None:
         missing_product_type: Annotated[
             bool, "Return only assets with no product type set"
         ] = False,
+        serial_number: Annotated[str, "Filter by exact serial number, e.g. 'CNU1234ABC'"] = "",
         sort_field: Annotated[str, "Field to sort by, e.g. 'created_time'"] = "",
         sort_order: Annotated[str, "Sort order: 'asc' or 'desc'"] = "",
     ) -> dict[str, Any]:
@@ -38,6 +39,10 @@ def register(app: FastMCP) -> None:
             filters.append({"field": "asset_state", "condition": "is", "value": state})
         if missing_product_type:
             filters.append({"field": "product_type", "condition": "is", "values": []})
+        if serial_number:
+            filters.append(
+                {"field": "serial_number", "condition": "is", "values": [serial_number]}
+            )
         if filters:
             list_info["search_criteria"] = filters
         params = {"input_data": json.dumps({"list_info": list_info})}
@@ -70,6 +75,14 @@ def register(app: FastMCP) -> None:
         site: Annotated[str, "Site name"] = "",
         department: Annotated[str, "Department name"] = "",
         assigned_to: Annotated[str, "User login name the asset is assigned to"] = "",
+        depreciation_type: Annotated[
+            str,
+            "Depreciation method name or numeric ID: 'Straight Line'=1, 'Declining Balance'=2, "
+            "'Sum Of The Years Digit'=3, 'Double Declining Balance'=4. Use list_depreciation_types "
+            "to confirm ids on this instance.",
+        ] = "",
+        useful_life: Annotated[str, "Useful life in months, e.g. '36'"] = "",
+        salvage_value: Annotated[str, "Salvage value at end of useful life, e.g. '100.00'"] = "",
     ) -> dict[str, Any]:
         """Create a new asset record."""
         asset: dict[str, Any] = {"name": name}
@@ -93,6 +106,20 @@ def register(app: FastMCP) -> None:
                 if "error" in pt_ref:
                     return pt_ref
                 asset["product_type"] = pt_ref
+            if depreciation_type or useful_life or salvage_value:
+                depreciation: dict[str, Any] = {}
+                if depreciation_type:
+                    dt_ref = await resolve_ref(
+                        c, "/depreciation_types", "depreciation_types", depreciation_type
+                    )
+                    if "error" in dt_ref:
+                        return dt_ref
+                    depreciation["depreciation_type"] = dt_ref
+                if useful_life:
+                    depreciation["useful_life"] = useful_life
+                if salvage_value:
+                    depreciation["salvage_value"] = salvage_value
+                asset["asset_depreciation"] = depreciation
             return await c.post("/assets", {"asset": asset})
 
     @app.tool()
@@ -103,6 +130,14 @@ def register(app: FastMCP) -> None:
         assigned_to: Annotated[str, "New user login name"] = "",
         site: Annotated[str, "New site name"] = "",
         department: Annotated[str, "New department name"] = "",
+        depreciation_type: Annotated[
+            str,
+            "Depreciation method name or numeric ID: 'Straight Line'=1, 'Declining Balance'=2, "
+            "'Sum Of The Years Digit'=3, 'Double Declining Balance'=4. Use list_depreciation_types "
+            "to confirm ids on this instance.",
+        ] = "",
+        useful_life: Annotated[str, "Useful life in months, e.g. '36'"] = "",
+        salvage_value: Annotated[str, "Salvage value at end of useful life, e.g. '100.00'"] = "",
     ) -> dict[str, Any]:
         """Update an existing asset record."""
         asset: dict[str, Any] = {}
@@ -117,7 +152,35 @@ def register(app: FastMCP) -> None:
         if department:
             asset["department"] = {"name": department}
         async with get_client() as c:
+            if depreciation_type or useful_life or salvage_value:
+                depreciation: dict[str, Any] = {}
+                if depreciation_type:
+                    dt_ref = await resolve_ref(
+                        c, "/depreciation_types", "depreciation_types", depreciation_type
+                    )
+                    if "error" in dt_ref:
+                        return dt_ref
+                    depreciation["depreciation_type"] = dt_ref
+                if useful_life:
+                    depreciation["useful_life"] = useful_life
+                if salvage_value:
+                    depreciation["salvage_value"] = salvage_value
+                asset["asset_depreciation"] = depreciation
             return await c.put(f"/assets/{asset_id}", {"asset": asset})
+
+    @app.tool()
+    async def delete_asset(
+        asset_id: Annotated[str, "Asset ID to delete"],
+    ) -> dict[str, Any]:
+        """Permanently delete an asset record. Unlike delete_request, this is NOT recoverable."""
+        async with get_client() as c:
+            return await c.delete(f"/assets/{asset_id}")
+
+    @app.tool()
+    async def list_depreciation_types() -> dict[str, Any]:
+        """List available asset depreciation methods."""
+        async with get_client() as c:
+            return await c.get("/depreciation_types")
 
     @app.tool()
     async def list_workstations(

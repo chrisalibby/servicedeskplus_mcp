@@ -4,13 +4,14 @@ An MCP (Model Context Protocol) server that exposes ManageEngine ServiceDesk Plu
 
 ## Features
 
-- **Service Requests** — list, create, update, close, trash, assign, pick up, add notes/tasks, manage resolutions
-- **Problems** — list, create, update, close, add notes
-- **Changes** — list, create, update, close, add notes/tasks, manage approvals (approve/reject)
+- **Service Requests** — list, create, update, close, trash, assign, pick up, add notes/tasks/worklogs, manage resolutions
+- **Problems** — list, create, update, close, add notes/tasks/worklogs
+- **Changes** — list, create, update, close, add notes/tasks/worklogs, manage approvals (approve/reject)
 - **Assets** — list, create, update assets and workstations
-- **CMDB** — list, create, update configuration items; manage CI relationships *(availability depends on your SDP license)*
+- **CMDB** — list, create, update configuration items; list CI relationships *(availability depends on your SDP license)*
+- **Contracts / Purchase Orders** — list/get both; create and update contracts
 - **Knowledge Base** — search solutions, get/create articles, list topics
-- **Admin lookups** — requesters, technicians, sites, categories, subcategories, priorities, statuses, urgencies, departments, announcements
+- **Admin lookups** — requesters, technicians, sites, categories, subcategories, priorities, statuses, urgencies, departments, announcements, products, product types
 
 ## Requirements
 
@@ -108,6 +109,16 @@ Add to your project or global `.claude/settings.json`:
   }
 }
 ```
+
+## Shared / Docker Hosting
+
+For a team, run one instance instead of installing locally on every machine. The server supports
+a streamable-HTTP transport (`SDP_TRANSPORT=http`) with per-connection API keys via an
+`X-SDP-API-Key` header, so a single deployment still attributes each technician's actions
+correctly. Deploy it directly with Python (see [SETUP.md](SETUP.md#shared-server-setup)) or in a
+container (`docker compose up -d --build` — see [DOCKER.md](DOCKER.md)); no Python/uv install is
+needed on the host either way, and technicians just point Claude Desktop/Claude Code at the
+server's URL with their own key.
 
 ## Tool Reference
 

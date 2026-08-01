@@ -5,18 +5,33 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from .client import request_api_key
-from .tools import admin, assets, changes, cmdb, contracts, problems, requests, solutions
+from .tools import (
+    admin,
+    assets,
+    changes,
+    cmdb,
+    contracts,
+    problems,
+    projects,
+    releases,
+    requests,
+    schemas,
+    solutions,
+)
 
 mcp = FastMCP("ServiceDesk Plus")
 
 requests.register(mcp)
 problems.register(mcp)
 changes.register(mcp)
+releases.register(mcp)
+projects.register(mcp)
 assets.register(mcp)
 cmdb.register(mcp)
 contracts.register(mcp)
 solutions.register(mcp)
 admin.register(mcp)
+schemas.register(mcp)
 
 
 class _ApiKeyMiddleware:

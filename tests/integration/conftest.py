@@ -27,12 +27,12 @@ skip_if_no_server = pytest.mark.skipif(
 def _live_settings() -> Settings:
     """Build a Settings instance directly from .env values, bypassing the module singleton."""
     return Settings(
-        SDP_SERVER=_env.get("SDP_SERVER", "localhost"),
-        SDP_PORT=int(_env.get("SDP_PORT", 8080)),
-        SDP_API_KEY=_env.get("SDP_API_KEY", ""),
-        SDP_PORTAL_ID=_env.get("SDP_PORTAL_ID", ""),
-        SDP_TIMEOUT=float(_env.get("SDP_TIMEOUT", 30)),
-        SDP_VERIFY_SSL=_env.get("SDP_VERIFY_SSL", "true").lower() != "false",
+        SDP_SERVER=_env.get("SDP_SERVER") or "localhost",
+        SDP_PORT=int(_env.get("SDP_PORT") or 8080),
+        SDP_API_KEY=_env.get("SDP_API_KEY") or "",
+        SDP_PORTAL_ID=_env.get("SDP_PORTAL_ID") or "",
+        SDP_TIMEOUT=float(_env.get("SDP_TIMEOUT") or 30),
+        SDP_VERIFY_SSL=(_env.get("SDP_VERIFY_SSL") or "true").lower() != "false",
     )
 
 
@@ -84,8 +84,34 @@ class _LiveClient:
         result: dict[str, Any] = r.json()
         return result
 
-    async def delete(self, path: str) -> dict[str, Any]:
-        r = await self._http.delete(path)
+    async def delete(self, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
+        if data is not None:
+            r = await self._http.request(
+                "DELETE", path, data=self._encode(data),
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+        else:
+            r = await self._http.delete(path)
+        if not r.is_success:
+            from servicedeskplus_mcp.client import _sdp_error
+            return _sdp_error(r)
+        result: dict[str, Any] = r.json()
+        return result
+
+    async def get_binary(self, path: str) -> dict[str, Any]:
+        r = await self._http.get(path)
+        if not r.is_success:
+            from servicedeskplus_mcp.client import _sdp_error
+            return _sdp_error(r)
+        return {"content": r.content, "content_type": r.headers.get("content-type", "")}
+
+    async def put_multipart(
+        self,
+        path: str,
+        files: dict[str, tuple[str, bytes, str]],
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        r = await self._http.put(path, files=files, params=params)
         if not r.is_success:
             from servicedeskplus_mcp.client import _sdp_error
             return _sdp_error(r)

@@ -57,6 +57,17 @@ async def test_list_assets_both_filters() -> None:
 
 
 @respx.mock
+async def test_list_assets_serial_number_filter() -> None:
+    route = respx.get(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"assets": []})
+    )
+    await get_tool("list_assets").fn(serial_number="SN12345")
+    params = decode_get_params(route.calls[0])
+    criteria = params["list_info"]["search_criteria"]
+    assert criteria[0] == {"field": "serial_number", "condition": "is", "values": ["SN12345"]}
+
+
+@respx.mock
 async def test_list_assets_missing_product_type_filter() -> None:
     route = respx.get(f"{BASE}/assets").mock(
         return_value=httpx.Response(200, json={"assets": []})
@@ -185,6 +196,53 @@ async def test_create_asset_all_optional_fields() -> None:
     assert asset["used_by"] == {"name": "jdoe"}
 
 
+@respx.mock
+async def test_create_asset_depreciation_with_numeric_type() -> None:
+    route = respx.post(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "205"}})
+    )
+    await get_tool("create_asset").fn(
+        name="LAPTOP-005",
+        product="4586",
+        depreciation_type="1",
+        useful_life="36",
+        salvage_value="150.00",
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["asset"]["asset_depreciation"] == {
+        "depreciation_type": {"id": "1"},
+        "useful_life": "36",
+        "salvage_value": "150.00",
+    }
+
+
+@respx.mock
+async def test_create_asset_depreciation_resolves_type_name() -> None:
+    respx.get(f"{BASE}/depreciation_types").mock(
+        return_value=httpx.Response(200, json={
+            "depreciation_types": [{"id": "1", "name": "Straight Line"}]
+        })
+    )
+    route = respx.post(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "206"}})
+    )
+    await get_tool("create_asset").fn(
+        name="LAPTOP-006", product="4586", depreciation_type="Straight Line"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["asset"]["asset_depreciation"] == {"depreciation_type": {"id": "1"}}
+
+
+@respx.mock
+async def test_create_asset_no_depreciation_fields_omits_key() -> None:
+    route = respx.post(f"{BASE}/assets").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "207"}})
+    )
+    await get_tool("create_asset").fn(name="LAPTOP-007", product="4586")
+    payload = decode_body(route.calls[0])
+    assert "asset_depreciation" not in payload["asset"]
+
+
 # ---------------------------------------------------------------------------
 # update_asset
 # ---------------------------------------------------------------------------
@@ -234,6 +292,38 @@ async def test_update_asset_site_and_department() -> None:
     payload = decode_body(route.calls[0])
     assert payload["asset"]["site"] == {"name": "Branch Office"}
     assert payload["asset"]["department"] == {"name": "Finance"}
+
+
+@respx.mock
+async def test_update_asset_depreciation_fields() -> None:
+    route = respx.put(f"{BASE}/assets/100").mock(
+        return_value=httpx.Response(200, json={"asset": {"id": "100"}})
+    )
+    await get_tool("update_asset").fn(
+        asset_id="100",
+        depreciation_type="2",
+        useful_life="48",
+        salvage_value="200.00",
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["asset"]["asset_depreciation"] == {
+        "depreciation_type": {"id": "2"},
+        "useful_life": "48",
+        "salvage_value": "200.00",
+    }
+
+
+# ---------------------------------------------------------------------------
+# list_depreciation_types
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_list_depreciation_types() -> None:
+    route = respx.get(f"{BASE}/depreciation_types").mock(
+        return_value=httpx.Response(200, json={"depreciation_types": []})
+    )
+    await get_tool("list_depreciation_types").fn()
+    assert route.called
 
 
 # ---------------------------------------------------------------------------
@@ -309,3 +399,16 @@ async def test_403_returns_error_dict() -> None:
     result = await get_tool("list_assets").fn()
     assert "error" in result
     assert result["status_code"] == 403
+
+
+# ---------------------------------------------------------------------------
+# delete_asset
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_delete_asset_url() -> None:
+    route = respx.delete(f"{BASE}/assets/100").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("delete_asset").fn(asset_id="100")
+    assert route.called

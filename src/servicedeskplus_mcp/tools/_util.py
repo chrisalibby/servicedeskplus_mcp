@@ -2,6 +2,7 @@
 
 import json
 import re
+from datetime import UTC, datetime
 from typing import Any
 
 from ..client import SDPClient
@@ -12,6 +13,12 @@ _CDATA_RE = re.compile(r"<!\[CDATA\[(.*?)\]\]>", re.DOTALL)
 def strip_cdata(text: str) -> str:
     text = _CDATA_RE.sub(r"\1", text)
     return text.replace("<![CDATA[", "").replace("]]>", "")
+
+
+def date_to_epoch_ms(date_str: str) -> str:
+    """Convert YYYY-MM-DD to epoch milliseconds string (UTC midnight)."""
+    dt = datetime.fromisoformat(date_str).replace(tzinfo=UTC)
+    return str(int(dt.timestamp() * 1000))
 
 
 def normalize_id(value: str) -> str:

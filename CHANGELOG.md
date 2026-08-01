@@ -3,6 +3,45 @@
 All notable changes to servicedeskplus-mcp are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/); dates are YYYY-MM-DD.
 
+## [Unreleased] — 2026-08-01
+
+Punch-list closeout: note editing, attachments, purchase order writes, asset depreciation, and several smaller request/asset gaps. Unit suite grew 111 → 146.
+
+### Added
+
+- **Note editing** — `update_request_note`, `update_problem_note`, `update_change_note` (`PUT /{requests,problems,changes}/{id}/notes/{note_id}`). Confirmed live on all three modules.
+- **Request attachments** — `list_request_attachments`, `get_request_attachment_content` (download, base64 or `save_to_path`), `add_request_attachment` (multipart upload). Confirmed live end-to-end (upload → list → download byte-for-byte match → trashed). See CLAUDE.md for the `_download`/`upload` path quirks.
+- **Purchase order writes** — `create_purchase_order`, `update_purchase_order`. Mandatory fields confirmed live: `name`, `custom_po_id`, `vendor`, `requested_by`, `items` (each needs `product`, `ordered_quantity`, `price`, `category`).
+- **Asset depreciation** — `create_asset`/`update_asset` gain `depreciation_type`, `useful_life`, `salvage_value` params (nested `asset_depreciation` object); `list_depreciation_types` added.
+- **Technician email resolution** — `create_request`/`update_request`/`assign_request` now accept a technician email in addition to display name, resolved to an ID via `/technicians` (shared `resolve_ref` helper).
+- **Smaller request/asset gaps** — `get_product` lookup tool, `list_assets` `serial_number` filter, `list_requests` category/subcategory/item filters, and a length guard on `close_request`'s `closure_comments`.
+
+### Documentation
+
+- Closed out two punch-list items as documented platform gaps (no code changes): `reply_request`/`forward_request` (the on-prem v3 API's only email-shaped resource, `/requests/{id}/drafts`, saves an unsent draft only — no send/dispatch operation exists) and @mentions/notify-on-notes (no `notify_to`/`mentions` field in the `request_note.html` schema).
+- CLAUDE.md quirks table: corrected the stale "technician params" row to reflect email resolution; added a taxonomy-caching-lag row (newly added categories/subcategories may lag in list results but work by name immediately); added a cross-cutting note tying together instance-config-dependent params (`closure_code`, `urgency`, `show_to_requester`).
+- Test counts refreshed across CLAUDE.md/NEXTSTEPS.md: 146 unit (was 111), 51+ integration.
+
+## [Unreleased] — 2026-07-20
+
+Docker deployment, CMDB/contract write support, and problems/changes feature parity with requests.
+
+### Added
+
+- **Docker deployment** — `Dockerfile`, `docker-compose.yml`, `.dockerignore`, and `DOCKER.md` for running the HTTP transport as a shared container; no credentials baked into the image, each client supplies its own `X-SDP-API-Key`.
+- **Problems/changes note, task, and worklog tools** — `list_problem_notes`, `list_problem_tasks`, `add_problem_task`, `list_problem_worklogs`, `add_problem_worklog`, `list_change_notes`, `add_change_task`, `list_change_worklogs`, `add_change_worklog`. Backfills problems and changes to the same coverage requests already had. Confirmed live that the worklog payload shape works fine here — the request-scoped worklog endpoint is the one still broken (see Fixed below).
+- **Contract write support** — `create_contract`, `update_contract`. Mandatory fields confirmed live: `name`, `custom_contract_id`, `type`, `vendor` (numeric ID), `from_date`/`to_date`.
+
+### Fixed
+
+- **CMDB create/update/relationships** — previously thought unavailable (404) on this instance; the real issue was the endpoint shape. Create/update are module-scoped (`POST`/`PUT /{module_type}` with body `{module_type: {...}}`, not `/cmdb` with `{"ci": {...}}`), and relationship listing uses `/cmdb/{id}/ci_relationships` (not `/relationships`). All confirmed live and cleaned up after testing. `add_ci_relationship` remains unresolved — it 400s on the `relationship_type` field regardless of shape tried.
+- **Groups doc contradiction** — API_COVERAGE.md said `/groups` "returns empty"; confirmed live it's actually a hard 404 "Invalid URL". Corrected to match CLAUDE.md/NEXTSTEPS.md.
+
+### Known limitations (updated)
+
+- `add_request_worklog` is still broken (400 on all formats), but now confirmed to be specific to the requests endpoint — the identical payload works on problems and changes worklogs.
+- Purchase order writes deferred — `POST /purchase_orders` requires a mandatory `items` line-item array whose schema wasn't probed live this round.
+
 ## [Unreleased] — 2026-07-17
 
 Real-world usage punch list: fixes and gaps surfaced by production use against the Spero SDP instance.

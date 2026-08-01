@@ -1,11 +1,12 @@
 # Technician Setup Guide — ServiceDesk Plus MCP
 
-This guide covers two deployment options:
+This guide covers three deployment options:
 
 - **Local install** — each technician installs the server on their own machine (Steps 1–6 below)
-- **Shared server** — an admin runs one central instance; technicians only need to configure Claude Desktop ([jump to Shared Server Setup](#shared-server-setup))
+- **Shared server** — an admin runs one central instance directly with Python ([jump to Shared Server Setup](#shared-server-setup))
+- **Docker** — an admin runs the same shared-server setup in a container, no Python install needed on the host ([see DOCKER.md](DOCKER.md))
 
-Both options preserve per-user API keys so activity in ServiceDesk Plus is attributed correctly.
+All three preserve per-user API keys so activity in ServiceDesk Plus is attributed correctly.
 
 ---
 
@@ -148,6 +149,12 @@ Claude should call the `list_requests` tool and return your open tickets. If you
 This option runs one instance of the MCP server on an internal host. Technicians point Claude
 Desktop at a URL instead of running a local command — no Python, no cloning, nothing to install
 on their machines.
+
+> **Prefer Docker?** If you'd rather not install Python/uv on the host at all, see
+> [DOCKER.md](DOCKER.md) — it covers the same shared-server model (`SDP_TRANSPORT=http`,
+> per-connection `X-SDP-API-Key`) via `docker compose up -d --build`. The technician-side Claude
+> Desktop/Claude Code config below is identical either way; only the admin's server-side setup
+> differs.
 
 ### Admin: server-side setup
 

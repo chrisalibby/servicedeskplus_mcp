@@ -140,6 +140,14 @@ def register(app: FastMCP) -> None:
         return await _paged_list("/products", page, page_size, filters)
 
     @app.tool()
+    async def get_product(
+        product_id: Annotated[str, "Product ID"],
+    ) -> dict[str, Any]:
+        """Get a single product by ID."""
+        async with get_client() as c:
+            return await c.get(f"/products/{product_id}")
+
+    @app.tool()
     async def list_product_types(
         page: Annotated[int, "Page number (1-based)"] = 1,
         page_size: Annotated[int, "Results per page (max 100)"] = 100,
@@ -154,6 +162,22 @@ def register(app: FastMCP) -> None:
     ) -> dict[str, Any]:
         """List all departments."""
         return await _paged_list("/departments", page, page_size)
+
+    @app.tool()
+    async def list_closure_codes(
+        page: Annotated[int, "Page number (1-based)"] = 1,
+        page_size: Annotated[int, "Results per page (max 100)"] = 25,
+    ) -> dict[str, Any]:
+        """List all closure codes. Confirmed live 2026-08-01."""
+        return await _paged_list("/closure_codes", page, page_size)
+
+    @app.tool()
+    async def list_change_types(
+        page: Annotated[int, "Page number (1-based)"] = 1,
+        page_size: Annotated[int, "Results per page (max 100)"] = 25,
+    ) -> dict[str, Any]:
+        """List all change types (e.g. Standard, Major, Emergency). Confirmed live 2026-08-01."""
+        return await _paged_list("/change_types", page, page_size)
 
     @app.tool()
     async def list_announcements(

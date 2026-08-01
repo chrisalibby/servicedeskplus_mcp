@@ -90,6 +90,39 @@ class SDPClient:
             return result
         return {"error": "Request failed after retries"}
 
+    async def get_binary(self, path: str) -> dict[str, Any]:
+        for attempt in range(_GET_RETRIES + 1):
+            try:
+                resp = await self._client.get(path)
+            except (httpx.ConnectError, httpx.TimeoutException) as exc:
+                if attempt < _GET_RETRIES:
+                    await asyncio.sleep(_RETRY_BACKOFF * (attempt + 1))
+                    continue
+                if isinstance(exc, httpx.ConnectError):
+                    return {"error": f"Cannot connect to SDP: {exc}"}
+                return {"error": "Request timed out — check SDP_SERVER and SDP_TIMEOUT"}
+            if not resp.is_success:
+                return _sdp_error(resp)
+            return {"content": resp.content, "content_type": resp.headers.get("content-type", "")}
+        return {"error": "Request failed after retries"}
+
+    async def post_multipart(
+        self,
+        path: str,
+        files: dict[str, tuple[str, bytes, str]],
+        data: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            resp = await self._client.put(path, files=files, params=data)
+        except httpx.ConnectError as exc:
+            return {"error": f"Cannot connect to SDP: {exc}"}
+        except httpx.TimeoutException:
+            return _indeterminate_error("PUT")
+        if not resp.is_success:
+            return _sdp_error(resp)
+        result: dict[str, Any] = resp.json()
+        return result
+
     async def post(self, path: str, data: dict[str, Any]) -> dict[str, Any]:
         try:
             resp = await self._client.post(
@@ -106,13 +139,16 @@ class SDPClient:
         result: dict[str, Any] = resp.json()
         return result
 
-    async def put(self, path: str, data: dict[str, Any]) -> dict[str, Any]:
+    async def put(self, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
         try:
-            resp = await self._client.put(
-                path,
-                data=self._encode(data),
-                headers={"Content-Type": "application/x-www-form-urlencoded"},
-            )
+            if data is not None:
+                resp = await self._client.put(
+                    path,
+                    data=self._encode(data),
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+            else:
+                resp = await self._client.put(path)
         except httpx.ConnectError as exc:
             return {"error": f"Cannot connect to SDP: {exc}"}
         except httpx.TimeoutException:
@@ -122,9 +158,17 @@ class SDPClient:
         result: dict[str, Any] = resp.json()
         return result
 
-    async def delete(self, path: str) -> dict[str, Any]:
+    async def delete(self, path: str, data: dict[str, Any] | None = None) -> dict[str, Any]:
         try:
-            resp = await self._client.delete(path)
+            if data is not None:
+                resp = await self._client.request(
+                    "DELETE",
+                    path,
+                    data=self._encode(data),
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                )
+            else:
+                resp = await self._client.delete(path)
         except httpx.ConnectError as exc:
             return {"error": f"Cannot connect to SDP: {exc}"}
         except httpx.TimeoutException:

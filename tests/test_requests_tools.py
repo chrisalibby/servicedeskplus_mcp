@@ -489,6 +489,25 @@ async def test_list_request_notes_url() -> None:
     assert route.called
 
 
+@respx.mock
+async def test_get_request_note_url() -> None:
+    route = respx.get(f"{BASE}/requests/8/notes/9").mock(
+        return_value=httpx.Response(200, json={"note": {"id": "9"}})
+    )
+    result = await get_tool("get_request_note").fn(request_id="8", note_id="9")
+    assert route.called
+    assert result["note"]["id"] == "9"
+
+
+@respx.mock
+async def test_delete_request_note_url() -> None:
+    route = respx.delete(f"{BASE}/requests/8/notes/9").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("delete_request_note").fn(request_id="8", note_id="9")
+    assert route.called
+
+
 # ---------------------------------------------------------------------------
 # worklogs
 # ---------------------------------------------------------------------------
@@ -623,3 +642,305 @@ async def test_401_returns_error_dict() -> None:
     result = await get_tool("list_requests").fn()
     assert "error" in result
     assert result["status_code"] == 401
+
+
+# ---------------------------------------------------------------------------
+# request tasks: get / update / delete
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_get_request_task_url() -> None:
+    route = respx.get(f"{BASE}/requests/1/tasks/9").mock(
+        return_value=httpx.Response(200, json={"task": {"id": "9", "title": "probe"}})
+    )
+    result = await get_tool("get_request_task").fn(request_id="1", task_id="9")
+    assert route.called
+    assert result["task"]["id"] == "9"
+
+
+@respx.mock
+async def test_update_request_task_payload_shape() -> None:
+    route = respx.put(f"{BASE}/requests/1/tasks/9").mock(
+        return_value=httpx.Response(200, json={"task": {"id": "9"}})
+    )
+    await get_tool("update_request_task").fn(
+        request_id="1",
+        task_id="9",
+        title="updated title",
+        description="updated description",
+        assigned_to="jdoe",
+        status="Closed",
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["task"]["title"] == "updated title"
+    assert payload["task"]["description"] == "updated description"
+    assert payload["task"]["owner"] == {"name": "jdoe"}
+    assert payload["task"]["status"] == {"name": "Closed"}
+
+
+@respx.mock
+async def test_delete_request_task_url() -> None:
+    route = respx.delete(f"{BASE}/requests/1/tasks/9").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("delete_request_task").fn(request_id="1", task_id="9")
+    assert route.called
+
+
+# ---------------------------------------------------------------------------
+# merge / summary / associations
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_merge_requests_payload_shape() -> None:
+    route = respx.put(f"{BASE}/requests/100/merge_requests").mock(
+        return_value=httpx.Response(200, json={
+            "response_status": {"status": "success", "status_code": 2000}
+        })
+    )
+    await get_tool("merge_requests").fn(request_id="100", merge_request_ids=["101", "102"])
+    payload = decode_body(route.calls[0])
+    assert payload["merge_requests"] == [{"id": "101"}, {"id": "102"}]
+
+
+@respx.mock
+async def test_merge_requests_normalizes_ids() -> None:
+    route = respx.put(f"{BASE}/requests/100/merge_requests").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("merge_requests").fn(request_id="RE-100", merge_request_ids=["#101"])
+    assert route.called
+    payload = decode_body(route.calls[0])
+    assert payload["merge_requests"] == [{"id": "101"}]
+
+
+@respx.mock
+async def test_get_request_summary_url() -> None:
+    route = respx.get(f"{BASE}/requests/8/summary").mock(
+        return_value=httpx.Response(200, json={"request_summary": {"note_count": 2}})
+    )
+    result = await get_tool("get_request_summary").fn(request_id="8")
+    assert route.called
+    assert result["request_summary"]["note_count"] == 2
+
+
+@respx.mock
+async def test_associate_problem_payload_shape() -> None:
+    route = respx.post(f"{BASE}/requests/8/problem").mock(
+        return_value=httpx.Response(200, json={
+            "request_problem_association": {"request": {"id": "8"}, "problem": {"id": "41"}}
+        })
+    )
+    await get_tool("associate_problem").fn(request_id="8", problem_id="41")
+    payload = decode_body(route.calls[0])
+    assert payload["request_problem_association"] == {"problem": {"id": "41"}}
+
+
+@respx.mock
+async def test_dissociate_problem_sends_body() -> None:
+    route = respx.delete(f"{BASE}/requests/8/problem").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("dissociate_problem").fn(request_id="8", problem_id="41")
+    assert route.called
+    payload = decode_body(route.calls[0])
+    assert payload["request_problem_association"] == {"problem": {"id": "41"}}
+
+
+@respx.mock
+async def test_associate_change_initiated() -> None:
+    route = respx.post(f"{BASE}/requests/8/request_initiated_change").mock(
+        return_value=httpx.Response(200, json={
+            "request_initiated_change": {"request": {"id": "8"}, "change": {"id": "116"}}
+        })
+    )
+    await get_tool("associate_change").fn(
+        request_id="8", change_id="116", association_type="initiated"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["request_initiated_change"] == {"change": {"id": "116"}}
+
+
+@respx.mock
+async def test_associate_change_caused_by() -> None:
+    route = respx.post(f"{BASE}/requests/8/request_caused_by_change").mock(
+        return_value=httpx.Response(200, json={
+            "request_caused_by_change": {"request": {"id": "8"}, "change": {"id": "116"}}
+        })
+    )
+    await get_tool("associate_change").fn(
+        request_id="8", change_id="116", association_type="caused_by"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["request_caused_by_change"] == {"change": {"id": "116"}}
+
+
+async def test_associate_change_invalid_type_returns_error() -> None:
+    result = await get_tool("associate_change").fn(
+        request_id="8", change_id="116", association_type="bogus"
+    )
+    assert "error" in result
+
+
+@respx.mock
+async def test_dissociate_change_initiated_sends_body() -> None:
+    route = respx.delete(f"{BASE}/requests/8/request_initiated_change").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("dissociate_change").fn(
+        request_id="8", change_id="116", association_type="initiated"
+    )
+    assert route.called
+    payload = decode_body(route.calls[0])
+    assert payload["request_initiated_change"] == {"change": {"id": "116"}}
+
+
+@respx.mock
+async def test_dissociate_change_caused_by_sends_body() -> None:
+    route = respx.delete(f"{BASE}/requests/8/request_caused_by_change").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("dissociate_change").fn(
+        request_id="8", change_id="116", association_type="caused_by"
+    )
+    assert route.called
+    payload = decode_body(route.calls[0])
+    assert payload["request_caused_by_change"] == {"change": {"id": "116"}}
+
+
+async def test_dissociate_change_invalid_type_returns_error() -> None:
+    result = await get_tool("dissociate_change").fn(
+        request_id="8", change_id="116", association_type="bogus"
+    )
+    assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# request worklogs: update / delete
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_update_request_worklog_payload_shape() -> None:
+    route = respx.put(f"{BASE}/requests/1/worklogs/5").mock(
+        return_value=httpx.Response(200, json={"worklog": {"id": "5"}})
+    )
+    await get_tool("update_request_worklog").fn(
+        request_id="1", worklog_id="5", description="edited", hours=2, minutes=30
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["worklog"]["description"] == "edited"
+    assert payload["worklog"]["time_spent"] == {"hours": 2, "minutes": 30}
+
+
+@respx.mock
+async def test_delete_request_worklog_url() -> None:
+    route = respx.delete(f"{BASE}/requests/1/worklogs/5").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("delete_request_worklog").fn(request_id="1", worklog_id="5")
+    assert route.called
+
+
+# ---------------------------------------------------------------------------
+# approval levels / approvals
+# ---------------------------------------------------------------------------
+
+@respx.mock
+async def test_list_request_approval_levels_url() -> None:
+    route = respx.get(f"{BASE}/requests/8/approval_levels").mock(
+        return_value=httpx.Response(200, json={"approval_levels": []})
+    )
+    await get_tool("list_request_approval_levels").fn(request_id="8")
+    assert route.called
+
+
+@respx.mock
+async def test_add_request_approval_level_email_approver() -> None:
+    route = respx.post(f"{BASE}/requests/8/approval_levels").mock(
+        return_value=httpx.Response(200, json={"approval_level": {"id": "1"}})
+    )
+    await get_tool("add_request_approval_level").fn(
+        request_id="8", approver="clibby@spero.financial"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["approval_level"]["approvals"] == [
+        {"approver": {"email_id": "clibby@spero.financial"}}
+    ]
+
+
+@respx.mock
+async def test_add_request_approval_level_name_approver() -> None:
+    route = respx.post(f"{BASE}/requests/8/approval_levels").mock(
+        return_value=httpx.Response(200, json={"approval_level": {"id": "1"}})
+    )
+    await get_tool("add_request_approval_level").fn(request_id="8", approver="Chris Libby")
+    payload = decode_body(route.calls[0])
+    assert payload["approval_level"]["approvals"] == [{"approver": {"name": "Chris Libby"}}]
+
+
+@respx.mock
+async def test_list_request_approvals_url() -> None:
+    route = respx.get(f"{BASE}/requests/8/approval_levels/3/approvals").mock(
+        return_value=httpx.Response(200, json={"approvals": []})
+    )
+    await get_tool("list_request_approvals").fn(request_id="8", level_id="3")
+    assert route.called
+
+
+@respx.mock
+async def test_add_request_approver_payload_shape() -> None:
+    route = respx.post(f"{BASE}/requests/8/approval_levels/3/approvals").mock(
+        return_value=httpx.Response(200, json={"approval": {"id": "1"}})
+    )
+    await get_tool("add_request_approver").fn(
+        request_id="8", level_id="3", approver="clibby@spero.financial", comments="please review"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["approval"]["approver"] == {"email_id": "clibby@spero.financial"}
+    assert payload["approval"]["comments"] == "please review"
+
+
+@respx.mock
+async def test_send_request_approval_notification_fetches_and_sends() -> None:
+    respx.get(f"{BASE}/requests/8/approval_levels/3/approvals/get_notification_content").mock(
+        return_value=httpx.Response(
+            200, json={"notification": {"title": "t", "description": "d"}}
+        )
+    )
+    route = respx.put(
+        f"{BASE}/requests/8/approval_levels/3/approvals/send_notification?ids=9"
+    ).mock(
+        return_value=httpx.Response(
+            200, json={"approvals": {"mail_sent_success_approvals": [9]}}
+        )
+    )
+    await get_tool("send_request_approval_notification").fn(
+        request_id="8", level_id="3", approval_id="9"
+    )
+    assert route.called
+    payload = decode_body(route.calls[0])
+    assert payload["approval"]["notification"] == {"title": "t", "description": "d"}
+
+
+@respx.mock
+async def test_approve_request_payload_shape() -> None:
+    route = respx.put(f"{BASE}/requests/8/approval_levels/3/approvals/9/_approve").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("approve_request").fn(
+        request_id="8", level_id="3", approval_id="9", comments="looks good"
+    )
+    payload = decode_body(route.calls[0])
+    assert payload["approval"]["comments"] == "looks good"
+    assert route.called
+
+
+@respx.mock
+async def test_reject_request_payload_shape() -> None:
+    route = respx.put(f"{BASE}/requests/8/approval_levels/3/approvals/9/_reject").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("reject_request").fn(request_id="8", level_id="3", approval_id="9")
+    payload = decode_body(route.calls[0])
+    assert payload["approval"] == {}
+    assert route.called
