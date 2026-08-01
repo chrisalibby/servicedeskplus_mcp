@@ -32,6 +32,14 @@ cd servicedeskplus_mcp
 
 ## Step 2 — Install dependencies
 
+With `uv` (preferred):
+
+```
+uv sync --extra dev
+```
+
+Or with plain `pip`:
+
 ```
 pip install -e .
 ```
@@ -130,6 +138,23 @@ In Claude Desktop, start a new conversation and type:
 
 Claude should call the `list_requests` tool and return your open tickets. If you see an error about the server, check that you are on the Spero network or VPN.
 
+### Optional — verify the test suite
+
+If you cloned for development rather than just running the server:
+
+```bash
+uv run pytest
+# Expected: 238 passed
+```
+
+Integration tests require a real `.env` and hit the live SDP instance:
+
+```bash
+uv run pytest tests/integration/ -m integration -v
+# Expected: 60+ passed (a few change-creation tests may transiently fail if SDP's
+# POST /changes rate limit was hit recently — re-run after a pause)
+```
+
 ---
 
 ## Troubleshooting
@@ -152,15 +177,21 @@ on their machines.
 
 > **Prefer Docker?** If you'd rather not install Python/uv on the host at all, see
 > [DOCKER.md](DOCKER.md) — it covers the same shared-server model (`SDP_TRANSPORT=http`,
-> per-connection `X-SDP-API-Key`) via `docker compose up -d --build`. The technician-side Claude
-> Desktop/Claude Code config below is identical either way; only the admin's server-side setup
-> differs.
+> per-connection `X-SDP-API-Key`) via `docker compose up -d --build`. In short: the `Dockerfile`
+> builds a slim image with the `sdp-mcp` entrypoint already set to `SDP_TRANSPORT=http` /
+> `SDP_HTTP_HOST=0.0.0.0` / `SDP_HTTP_PORT=8000`; `docker-compose.yml` sets `SDP_SERVER`,
+> `SDP_PORT`, `SDP_VERIFY_SSL`, and `SDP_TIMEOUT` for `sdp.example.com` and deliberately
+> **omits `SDP_API_KEY`** so every client must supply its own `X-SDP-API-Key` header. The compose
+> file does not include a reverse proxy or TLS termination — the same Caddy/nginx guidance below
+> (step 4) applies in front of the container's published port 8000, exactly as it would for a
+> bare Python process. The technician-side Claude Desktop/Claude Code config below is identical
+> either way; only the admin's server-side setup differs.
 
 ### Admin: server-side setup
 
 **1. Install on the server**
 
-Follow Steps 1–2 of the local install on the server host (clone the repo, `pip install -e .`).
+Follow Steps 1–2 of the local install on the server host (clone the repo, then `uv sync --extra dev` or `pip install -e .`).
 
 **2. Create the server `.env`**
 
@@ -285,10 +316,9 @@ key. Save the file and restart Claude Desktop.
 
 ## What Claude can do with this integration
 
-- Create, update, close, and look up service requests
-- Add notes and log work time on tickets
-- List open/assigned tickets, filter by date or status
-- Search the knowledge base
-- Look up requesters, technicians, categories, and subcategories
-- View CMDB configuration items (IT services, devices, support groups)
-- Create and manage problem and change records
+This server exposes 162 tools covering requests, problems, changes, releases, projects, assets,
+CMDB, the knowledge base, contracts, purchase orders, and admin lookups — full lifecycles
+(notes, tasks, worklogs, attachments, approvals) on the ticket-shaped modules, not just basic
+CRUD. For the practical, prompt-oriented version of "what can I ask for", see
+**[USAGE.md](USAGE.md)**. For the exhaustive per-endpoint breakdown, see
+[API_COVERAGE.md](API_COVERAGE.md).

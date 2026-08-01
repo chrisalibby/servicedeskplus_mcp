@@ -4,14 +4,33 @@ An MCP (Model Context Protocol) server that exposes ManageEngine ServiceDesk Plu
 
 ## Features
 
-- **Service Requests** — list, create, update, close, trash, assign, pick up, add notes/tasks/worklogs, manage resolutions
-- **Problems** — list, create, update, close, add notes/tasks/worklogs
-- **Changes** — list, create, update, close, add notes/tasks/worklogs, manage approvals (approve/reject)
-- **Assets** — list, create, update assets and workstations
-- **CMDB** — list, create, update configuration items; list CI relationships *(availability depends on your SDP license)*
-- **Contracts / Purchase Orders** — list/get both; create and update contracts
-- **Knowledge Base** — search solutions, get/create articles, list topics
-- **Admin lookups** — requesters, technicians, sites, categories, subcategories, priorities, statuses, urgencies, departments, announcements, products, product types
+162 tools across eleven modules:
+
+- **Service Requests** — full CRUD, close/assign/pick up/merge (irreversible)/summary; notes (add/list/get/edit/delete); tasks (add/list/get/update/delete); worklogs (add/list/update/delete); resolution get/update; attachments (list/download/upload); approval workflow (add level + approver, send notification, approve/reject); problem and change associations (initiated/caused-by)
+- **Problems** — full CRUD + permanent delete; notes (add/list/get/edit/delete); tasks (add/list/get/update/delete); worklogs (add/list/update/delete)
+- **Changes** — full CRUD + trash/restore/copy; notes, tasks, worklogs (same shape as requests); approve/reject; approval level listing
+- **Releases** — list/get/create/update/close; notes, tasks (stage required), worklogs
+- **Projects** — list/get/create/update/delete; milestones; tasks; member management (add/list/remove, with email-to-name verification); comments
+- **Assets** — full CRUD (delete is permanent) including depreciation fields (`depreciation_type`, `useful_life`, `salvage_value`) and `list_depreciation_types`; workstations (list/get)
+- **CMDB** — list/get/create/update/delete configuration items (module-scoped); list CI relationships *(adding relationships is unresolved on this instance — see Known limitations)*
+- **Knowledge Base (Solutions)** — search, get, create (topic required), update, two-step delete (trash then purge), approval status via update, attachment upload, topic create/list
+- **Contracts** — list/get/create/update
+- **Purchase Orders** — full CRUD (list/get/create/update)
+- **Admin lookups** — requesters, technicians, sites, categories, subcategories, priorities, statuses, urgencies, departments, announcements, products, product types, closure codes, change types, depreciation types
+
+### MCP schema resources
+
+Three `sdp://schema/...` resources document write shapes that are easy to get wrong (nested objects, nonstandard payload keys): `sdp://schema/asset`, `sdp://schema/ci-relationship`, `sdp://schema/purchase-order`.
+
+### Known limitations
+
+See [API_COVERAGE.md](API_COVERAGE.md) and [NEXTSTEPS.md](NEXTSTEPS.md) for the full per-module breakdown. Notable gaps:
+
+- `add_request_worklog` — the POST is broken on the requests endpoint on some on-prem instances (the identical payload works fine on problems and changes); confirmed on the Spero instance.
+- `add_ci_relationship` — 400s on the relationship-type field regardless of shape tried; likely needs a relationship-type lookup endpoint that doesn't exist yet.
+- `close_change` — direct status transitions are rejected where the instance enforces workflow progression (Requested → In Review → Approved → In Progress → Completed).
+- No email send API — the on-prem v3 REST API can only save an unsent draft reply/forward (`/requests/{id}/drafts`); there is no dispatch/send operation, so `reply_request`/`forward_request` were not built.
+- No @mentions — the note schema has no `notify_to`/`mentions` field.
 
 ## Requirements
 
@@ -110,113 +129,23 @@ Add to your project or global `.claude/settings.json`:
 }
 ```
 
-## Shared / Docker Hosting
+## Deployment
 
-For a team, run one instance instead of installing locally on every machine. The server supports
-a streamable-HTTP transport (`SDP_TRANSPORT=http`) with per-connection API keys via an
-`X-SDP-API-Key` header, so a single deployment still attributes each technician's actions
-correctly. Deploy it directly with Python (see [SETUP.md](SETUP.md#shared-server-setup)) or in a
-container (`docker compose up -d --build` — see [DOCKER.md](DOCKER.md)); no Python/uv install is
-needed on the host either way, and technicians just point Claude Desktop/Claude Code at the
-server's URL with their own key.
+Three ways to run this server, in increasing order of centralization:
 
-## Tool Reference
+1. **Local stdio, per-technician** (default) — each technician clones the repo and runs `sdp-mcp` locally via `stdio` transport, with their own `SDP_API_KEY` in `.env`. See [SETUP.md](SETUP.md).
+2. **Shared HTTP server** — one host runs `sdp-mcp` with `SDP_TRANSPORT=http` (streamable-HTTP, via `uvicorn`). `SDP_API_KEY` is left unset on the server; each client supplies their own key in an `X-SDP-API-Key` header, so actions are still attributed per-technician in SDP's audit logs. Put a reverse proxy (Caddy/nginx) in front for TLS — see [SETUP.md](SETUP.md#shared-server-setup).
+3. **Docker / docker-compose** — same shared-HTTP model, containerized. `docker compose up -d --build` builds the image (see `Dockerfile`) and starts it on port 8000 per `docker-compose.yml`; no Python/uv install needed on the host. See [DOCKER.md](DOCKER.md).
 
-### Service Requests (`tools/requests.py`)
+Relevant env vars (see `config.py`): `SDP_TRANSPORT` (`stdio`/`http`), `SDP_HTTP_HOST`, `SDP_HTTP_PORT`, `SDP_TRUST_PROXY`.
 
-| Tool | Description |
-|---|---|
-| `list_requests` | List requests with optional status/technician/date filters and pagination |
-| `get_request` | Get a single request by ID |
-| `create_request` | Create a new service request (supports subcategory) |
-| `update_request` | Update fields on an existing request |
-| `close_request` | Close a request; closure code is optional |
-| `delete_request` | Move a request to trash (recoverable from SDP Trash view) |
-| `assign_request` | Assign a request to a technician and/or group |
-| `pickup_request` | Pick up a request (assign to the API key owner) |
-| `add_request_note` | Add a public or private note |
-| `list_request_notes` | List all notes on a request |
-| `add_request_worklog` | Log time worked on a request (requires `technician_email`) |
-| `list_request_worklogs` | List all worklog entries |
-| `get_request_resolution` | Get the current resolution |
-| `update_request_resolution` | Set or update the resolution |
-| `list_request_tasks` | List tasks associated with a request |
-| `add_request_task` | Add a task to a request |
+## Documentation
 
-### Problems (`tools/problems.py`)
-
-| Tool | Description |
-|---|---|
-| `list_problems` | List problems with optional status filter |
-| `get_problem` | Get a single problem by ID |
-| `create_problem` | Create a new problem record |
-| `update_problem` | Update an existing problem |
-| `close_problem` | Close a problem |
-| `add_problem_note` | Add a note to a problem |
-
-### Changes (`tools/changes.py`)
-
-| Tool | Description |
-|---|---|
-| `list_changes` | List changes with optional status filter |
-| `get_change` | Get a single change by ID |
-| `create_change` | Create a new change record |
-| `update_change` | Update an existing change |
-| `close_change` | Close a change |
-| `add_change_note` | Add a note to a change |
-| `list_change_tasks` | List tasks on a change |
-| `list_pending_approvals` | List pending approvals for a change |
-| `approve_change` | Approve a pending change approval |
-| `reject_change` | Reject a pending change approval |
-
-### Assets (`tools/assets.py`)
-
-| Tool | Description |
-|---|---|
-| `list_assets` | List assets with optional type/state filters |
-| `get_asset` | Get a single asset by ID |
-| `create_asset` | Create a new asset record |
-| `update_asset` | Update an existing asset |
-| `list_workstations` | List workstation assets |
-| `get_workstation` | Get a single workstation by ID |
-
-### CMDB (`tools/cmdb.py`)
-
-| Tool | Description |
-|---|---|
-| `list_configuration_items` | List CIs; filter by `module_type` (e.g. `cmdb_itservice`) |
-| `get_configuration_item` | Get a single CI by ID |
-| `create_configuration_item` | Create a new CI |
-| `update_configuration_item` | Update an existing CI |
-| `list_ci_relationships` | List relationships for a CI |
-| `add_ci_relationship` | Add a relationship between two CIs |
-
-### Knowledge Base (`tools/solutions.py`)
-
-| Tool | Description |
-|---|---|
-| `search_solutions` | Search solutions by keyword |
-| `get_solution` | Get a single solution article by ID |
-| `create_solution` | Create a new solution article |
-| `list_solution_topics` | List all knowledge base topics |
-
-### Admin Lookups (`tools/admin.py`)
-
-| Tool | Description |
-|---|---|
-| `list_requesters` | List all requesters |
-| `get_requester` | Get a requester by ID |
-| `list_technicians` | List all technicians |
-| `get_technician` | Get a technician by ID |
-| `list_groups` | List technician groups |
-| `list_sites` | List all sites |
-| `list_categories` | List request categories |
-| `list_subcategories` | List all subcategories (includes parent category) |
-| `list_priorities` | List priority levels |
-| `list_statuses` | List request statuses |
-| `list_urgencies` | List urgency levels |
-| `list_departments` | List all departments |
-| `list_announcements` | List active announcements |
+- [SETUP.md](SETUP.md) — step-by-step technician and admin setup for all three deployment modes
+- [USAGE.md](USAGE.md) — practical prompt guide for technicians using this through Claude
+- [API_COVERAGE.md](API_COVERAGE.md) — authoritative per-module table of every SDP REST API operation vs. MCP tool coverage
+- [CHANGELOG.md](CHANGELOG.md) — release history
+- [NEXTSTEPS.md](NEXTSTEPS.md) — current state, known gaps, and future work
 
 ## Development
 
@@ -234,12 +163,15 @@ cp .env.example .env
 
 ```bash
 uv run pytest
+# Expected: 238 passed
 ```
 
 ### Run integration tests (requires live SDP in `.env`)
 
 ```bash
 uv run pytest tests/integration/ -m integration -v
+# Expected: 60+ passed (a handful may transiently fail if SDP's POST /changes
+# rate limit has been hit recently — re-run after a pause)
 ```
 
 ### Lint and type check
@@ -257,24 +189,14 @@ uv run sdp-mcp
 uv run python -m servicedeskplus_mcp
 ```
 
-## Known Limitations
-
-These were discovered during integration testing against a real on-prem instance:
-
-| Area | Status | Notes |
-|---|---|---|
-| Groups (`list_groups`) | May 404 | `/groups` returns 404 or 400 on some instances. |
-| CMDB create/update | Not supported | `POST /cmdb` and relationships return 404. List and get-by-ID work. |
-| `close_change` | Instance-dependent | Changes may require workflow progression (Requested → Approved → Completed). Direct status PUT is rejected on some instances. |
-| Closure codes | Optional | `close_request` works without a closure code; include one only if your instance requires it. |
-| `delete_request` | Trash only | Moves to SDP Trash (recoverable). There is no permanently-delete tool. |
-| Date filters | Cannot combine | `opened_after`/`opened_before`/`due_before` on `list_requests` cannot be combined with `status` or `technician` filters on some instances. |
-
 ## Roadmap
 
-- **Cloud / OAuth2 support** — SDP Cloud uses OAuth2; planned as next major feature
-- **Attachments** — upload and download file attachments on requests, problems, and changes
+See [NEXTSTEPS.md](NEXTSTEPS.md) for the full list. Highlights:
+
+- **Cloud / OAuth2 support** — SDP Cloud uses OAuth2 instead of API key auth; planned if the target instance ever migrates to cloud
+- **CMDB relationship writes** — `add_ci_relationship` still unresolved
 - **Bulk operations** — batch-update multiple records in a single tool call
+- **Change workflow progression** — tooling to advance a change through its workflow stages so `close_change` can succeed on instances that enforce it
 
 ## License
 

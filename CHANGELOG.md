@@ -3,24 +3,40 @@
 All notable changes to servicedeskplus-mcp are documented here.
 Format based on [Keep a Changelog](https://keepachangelog.com/); dates are YYYY-MM-DD.
 
-## [Unreleased] — 2026-08-01
+## [0.2.0] — 2026-08-01
 
-Punch-list closeout: note editing, attachments, purchase order writes, asset depreciation, and several smaller request/asset gaps. Unit suite grew 111 → 146.
+API gap-closure release: three new modules (Releases, Projects, Contracts/Purchase Orders writes), full CRUD depth (get/update/delete) on notes/tasks/worklogs across requests/problems/changes, the request approval workflow, permanent-delete support on assets/CIs/problems, merge/summary/associations on requests, and MCP schema resources documenting gnarly write shapes. Tool count grew 68 → 162; unit suite grew 111 → 238.
 
 ### Added
 
-- **Note editing** — `update_request_note`, `update_problem_note`, `update_change_note` (`PUT /{requests,problems,changes}/{id}/notes/{note_id}`). Confirmed live on all three modules.
-- **Request attachments** — `list_request_attachments`, `get_request_attachment_content` (download, base64 or `save_to_path`), `add_request_attachment` (multipart upload). Confirmed live end-to-end (upload → list → download byte-for-byte match → trashed). See CLAUDE.md for the `_download`/`upload` path quirks.
+- **Releases module** (`tools/releases.py`, 12 tools) — list/get/create/update/close, notes (add/list/edit), tasks (add/list — `stage` mandatory), worklogs (add/list). Confirmed live; only `title` is mandatory to create. `close_release` is permission-gated on this instance (403 for the standard technician role).
+- **Projects module** (`tools/projects.py`, 14 tools) — list/get/create/update/delete (permanent, no trash), milestones (add/list), tasks (add/list, no `stage` requirement), members (add/list/remove), comments (add/list, payload key `content` not `description`). Confirmed live.
+- **Request approval workflow** — `list_request_approval_levels`, `add_request_approval_level`, `list_request_approvals`, `add_request_approver`, `send_request_approval_notification`, `approve_request`, `reject_request`. Confirmed live end-to-end 2026-08-01 (create → level → approver → notify → approve → trash). `approve_request` 400s "Recommendation mail is not yet sent" until the notification step has run at least once.
 - **Purchase order writes** — `create_purchase_order`, `update_purchase_order`. Mandatory fields confirmed live: `name`, `custom_po_id`, `vendor`, `requested_by`, `items` (each needs `product`, `ordered_quantity`, `price`, `category`).
+- **Note editing and full note CRUD** — `update_request_note`/`update_problem_note`/`update_change_note` plus `get_*_note`/`delete_*_note` on all three modules, confirmed live.
+- **Task and worklog CRUD depth** — `get_*_task`/`update_*_task`/`delete_*_task` and `update_*_worklog`/`delete_*_worklog` across requests, problems, and changes.
+- **Request attachments** — `list_request_attachments`, `get_request_attachment_content` (download, base64 or `save_to_path`), `add_request_attachment` (multipart upload). Confirmed live end-to-end (upload → list → download byte-for-byte match → trashed). See CLAUDE.md for the `_download`/`upload` path quirks.
+- **Permanent deletes** — `delete_problem`, `delete_change`/`restore_change`, `delete_configuration_item`, `delete_asset` (all confirmed permanent unlike `delete_request`'s trash behavior). `copy_change` added per docs (unverified live — change-create is rate-limited on this instance).
+- **Request merge, summary, and associations** — `merge_requests` (confirmed live, **irreversible** — the merged-away request becomes permanently unfetchable), `get_request_summary`, `associate_problem`/`dissociate_problem`, `associate_change`/`dissociate_change` (initiated and caused-by).
+- **Solutions** — `update_solution` (incl. approval status via plain field update), `add_solution_attachment`, `create_solution_topic`.
 - **Asset depreciation** — `create_asset`/`update_asset` gain `depreciation_type`, `useful_life`, `salvage_value` params (nested `asset_depreciation` object); `list_depreciation_types` added.
+- **Admin lookups** — `list_closure_codes`, `list_change_types`.
 - **Technician email resolution** — `create_request`/`update_request`/`assign_request` now accept a technician email in addition to display name, resolved to an ID via `/technicians` (shared `resolve_ref` helper).
 - **Smaller request/asset gaps** — `get_product` lookup tool, `list_assets` `serial_number` filter, `list_requests` category/subcategory/item filters, and a length guard on `close_request`'s `closure_comments`.
+- **MCP schema resources** — `sdp://schema/asset`, `sdp://schema/ci-relationship`, `sdp://schema/purchase-order` document the gnarly nested write shapes for these payloads.
+- **Client resilience** — `get_binary`/`post_multipart` for attachments, and optional bodies on DELETE/PUT for endpoints that reject one.
+
+### Fixed
+
+- **`delete_solution`** — root-caused the "Not in trash" 400: the working flow is two-step, `DELETE /solutions/{id}/_move_to_trash` (underscore-prefixed action route, not `/move_to_trash`) followed by `DELETE /solutions/{id}` to purge. Previously undocumented and unresolved; now implemented and confirmed live, including cleanup of three leftover test articles.
+- **`add_project_member`** — root-caused a bug where the API ignored the given `email_id` entirely and always added the same unrelated technician regardless of input; a bare `user.id` is also rejected. Fix resolves the email to a unique display name via `/users`, submits `user.name`, then verifies the member SDP actually added matches by email and auto-removes it on mismatch (duplicate display names exist on this instance). Added `remove_project_member`.
 
 ### Documentation
 
 - Closed out two punch-list items as documented platform gaps (no code changes): `reply_request`/`forward_request` (the on-prem v3 API's only email-shaped resource, `/requests/{id}/drafts`, saves an unsent draft only — no send/dispatch operation exists) and @mentions/notify-on-notes (no `notify_to`/`mentions` field in the `request_note.html` schema).
+- Confirmed unavailable on this on-prem instance: problem approvals (4007 "Invalid URL"), flat `/changes/{id}/approvals` pending-approvals path (5 path variants tried), `/change_risks` (404).
 - CLAUDE.md quirks table: corrected the stale "technician params" row to reflect email resolution; added a taxonomy-caching-lag row (newly added categories/subcategories may lag in list results but work by name immediately); added a cross-cutting note tying together instance-config-dependent params (`closure_code`, `urgency`, `show_to_requester`).
-- Test counts refreshed across CLAUDE.md/NEXTSTEPS.md: 146 unit (was 111), 51+ integration.
+- Test counts refreshed across CLAUDE.md/NEXTSTEPS.md/README.md: 238 unit (was 111), 60+ integration.
 
 ## [Unreleased] — 2026-07-20
 
