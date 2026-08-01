@@ -54,12 +54,30 @@ async def test_update_solution_payload_shape() -> None:
 
 
 @respx.mock
-async def test_delete_solution_url() -> None:
-    route = respx.delete(f"{BASE}/solutions/1").mock(
+async def test_delete_solution_moves_to_trash_then_purges() -> None:
+    trash_route = respx.delete(f"{BASE}/solutions/1/_move_to_trash").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    purge_route = respx.delete(f"{BASE}/solutions/1").mock(
         return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
     )
     await get_tool("delete_solution").fn(solution_id="1")
-    assert route.called
+    assert trash_route.called
+    assert purge_route.called
+
+
+@respx.mock
+async def test_delete_solution_stops_if_trash_fails() -> None:
+    trash_route = respx.delete(f"{BASE}/solutions/1/_move_to_trash").mock(
+        return_value=httpx.Response(400, json={"response_status": {"status": "failed"}})
+    )
+    purge_route = respx.delete(f"{BASE}/solutions/1").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    result = await get_tool("delete_solution").fn(solution_id="1")
+    assert trash_route.called
+    assert not purge_route.called
+    assert "error" in result
 
 
 @respx.mock

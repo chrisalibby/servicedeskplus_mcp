@@ -56,7 +56,7 @@ def test_expected_tools_registered() -> None:
         "list_projects", "get_project", "create_project", "update_project", "delete_project",
         "list_project_milestones", "add_project_milestone",
         "list_project_tasks", "add_project_task",
-        "list_project_members", "add_project_member",
+        "list_project_members", "add_project_member", "remove_project_member",
         "list_project_comments", "add_project_comment",
         "list_assets", "get_asset", "create_asset", "update_asset", "delete_asset",
         "list_workstations", "get_workstation",

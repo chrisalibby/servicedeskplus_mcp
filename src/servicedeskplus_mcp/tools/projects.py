@@ -160,12 +160,76 @@ def register(app: FastMCP) -> None:
             str, "Member role name, e.g. 'Team Member', 'Project Admin'"
         ] = "Team Member",
     ) -> dict[str, Any]:
-        """Add a member to a project record. Note: on this instance the API has been
-        observed to resolve the given email_id to a different technician than requested
-        (unconfirmed root cause) — verify the returned member's user matches expectations."""
-        member = {"user": {"email_id": technician_email}, "role": {"name": role}}
+        """Add a member to a project record. Note: on this instance `POST
+        /projects/{id}/members` with `user.email_id` is broken — it ignores the value
+        entirely and always adds the same unrelated technician. This tool works around
+        that by resolving the email to a display name via `/users` and submitting
+        `user.name` instead, then verifying the member SDP actually added matches the
+        requested email. If SDP still adds the wrong person (happens when two accounts
+        share a display name), the wrongly-added member is automatically removed and an
+        error is returned instead of silently leaving the wrong person on the project."""
         async with get_client() as c:
-            return await c.post(f"/projects/{project_id}/members", {"member": member})
+            lookup = await c.get(
+                "/users",
+                params={
+                    "input_data": json.dumps(
+                        {
+                            "list_info": {
+                                "row_count": 5,
+                                "search_criteria": [
+                                    {
+                                        "field": "email_id",
+                                        "condition": "is",
+                                        "value": technician_email,
+                                    }
+                                ],
+                            }
+                        }
+                    )
+                },
+            )
+            if "error" in lookup:
+                return {"error": f"User lookup failed: {lookup['error']}"}
+            users = lookup.get("users", [])
+            if len(users) != 1:
+                return {
+                    "error": f"Could not uniquely resolve '{technician_email}' to a user "
+                    f"(found {len(users)} matches) — refusing to guess to avoid adding "
+                    "the wrong person."
+                }
+            display_name = users[0].get("linked_instance", {}).get("name") or users[0].get(
+                "name"
+            )
+            if not display_name:
+                return {"error": f"User record for '{technician_email}' has no display name"}
+            member = {"user": {"name": display_name}, "role": {"name": role}}
+            result = await c.post(f"/projects/{project_id}/members", {"member": member})
+            if "error" in result:
+                return result
+            added_user = result.get("member", {}).get("user", {})
+            if added_user.get("email_id") != technician_email:
+                member_id = result.get("member", {}).get("id")
+                if member_id:
+                    await c.delete(f"/projects/{project_id}/members/{member_id}")
+                return {
+                    "error": f"SDP added the wrong person (got '{added_user.get('name')}' "
+                    f"<{added_user.get('email_id')}>, requested '{technician_email}') — "
+                    "this happens when multiple accounts share a display name on this "
+                    "instance. The wrongly-added member was removed automatically.",
+                    "requested_email": technician_email,
+                    "resolved_name": display_name,
+                    "wrongly_added": added_user,
+                }
+            return result
+
+    @app.tool()
+    async def remove_project_member(
+        project_id: Annotated[str, "Project ID"],
+        member_id: Annotated[str, "Member record ID (from list_project_members), not user ID"],
+    ) -> dict[str, Any]:
+        """Remove a member from a project record."""
+        async with get_client() as c:
+            return await c.delete(f"/projects/{project_id}/members/{member_id}")
 
     @app.tool()
     async def list_project_comments(

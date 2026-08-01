@@ -90,11 +90,13 @@ def register(app: FastMCP) -> None:
     async def delete_solution(
         solution_id: Annotated[str, "Solution/article ID to delete"],
     ) -> dict[str, Any]:
-        """Delete a knowledge base solution article. Unlike requests, this instance has no
-        working move-to-trash sub-route for solutions — a direct DELETE consistently returns
-        'Not in trash', so deletion may require moving the article to trash from the SDP UI
-        first. Confirm the result before relying on this in automation."""
+        """Delete a knowledge base solution article. A direct DELETE returns 'Not in trash' on
+        this instance — it requires a two-step flow: DELETE .../_move_to_trash first, then
+        DELETE the article itself to purge it."""
         async with get_client() as c:
+            trash_result = await c.delete(f"/solutions/{solution_id}/_move_to_trash")
+            if "error" in trash_result:
+                return trash_result
             return await c.delete(f"/solutions/{solution_id}")
 
     @app.tool()

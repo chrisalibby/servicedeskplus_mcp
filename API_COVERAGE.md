@@ -297,7 +297,7 @@ API** — closing as a documented platform gap, not a missing tool.
 | Resource | Operations | MCP tool |
 |---|---|---|
 | Project record | List / get / create / update / delete | ✅ `list_projects`, `get_project`, `create_project`, `update_project`, `delete_project` — no `move_to_trash` endpoint for projects on this instance (404s "Invalid URL"); `delete_project` is a direct, non-recoverable delete |
-| Members | Add / list | ✅ `add_project_member`, `list_project_members` — on this instance the API has been observed to resolve the given `email_id` to a different technician than requested (unconfirmed root cause); verify the returned member before relying on it |
+| Members | Add / list / remove | ✅ `add_project_member`, `list_project_members`, `remove_project_member` — raw `POST` with `user.email_id` is broken on this instance (always adds an unrelated technician regardless of the email given); `add_project_member` now resolves the email to a display name via `/users`, submits `user.name`, and verifies + auto-removes on a mismatch (root-caused and fixed 2026-08-01, see CLAUDE.md quirks table) |
 | Milestones | Add / list | ✅ `add_project_milestone`, `list_project_milestones` |
 | Tasks | Add / list | ✅ `add_project_task`, `list_project_tasks` — unlike release tasks, `stage` is not mandatory here |
 | Task worklogs (🔵 cloud-inferred) | CRUD | ❌ (not probed — out of scope this round) |
@@ -353,7 +353,7 @@ API** — closing as a documented platform gap, not a missing tool.
 | Update | `PUT /solutions/{id}` | ✅ `update_solution` |
 | Approve / reject | `PUT /solutions/{id}` with `approval_status: {"name": ...}` | ✅ via `update_solution` — the cloud-style `_approve`/`_reject` action sub-routes exist on this instance (400, not 404) but reject the payload shapes tried; plain field update works and was used instead |
 | Publish (🔵 cloud-only) | `PUT /solutions/{id}/_publish` | ❌ confirmed 404 "Invalid URL" on this instance |
-| Delete | `DELETE /solutions/{id}` | ⚠️ `delete_solution` implemented, but consistently returns "Not in trash" live on this instance — no working move-to-trash sub-route was found; unresolved |
+| Delete | `DELETE /solutions/{id}/_move_to_trash` then `DELETE /solutions/{id}` | ✅ `delete_solution` — two-step flow confirmed live 2026-08-01; a bare `DELETE /solutions/{id}` 400s "Not in trash" until the article is moved to trash first |
 | Like / dislike (🔵 cloud-inferred) | `PUT /solutions/{id}/_like` etc. | ❌ not probed |
 | List topics | `GET /topics` | ✅ `list_solution_topics` |
 | Create topic | `POST /topics` | ✅ `create_solution_topic` |
@@ -452,10 +452,10 @@ These endpoints exist in the cloud API and share the same path structure. Availa
 | Problems | 20 | Core CRUD + delete (permanent, added 2026-08-01) + notes (add/list/edit/get/delete), tasks (add/list/get/update/delete), worklogs (add/list/update/delete). Note get/delete and record delete confirmed live 2026-08-01. Approvals confirmed unavailable on this on-prem instance 2026-08-01 (4007 Invalid URL). |
 | Changes | 26 | Core CRUD + trash/restore/copy (added 2026-08-01 — trash+restore confirmed live on an existing test change, copy unverified) + notes (add/list/edit/get/delete), tasks (add/list/get/update/delete), worklogs (add/list/update/delete), approve/reject, list approval levels (read-only, endpoint valid but returns Internal Error on changes with no configured levels). List pending approvals (flat path) re-confirmed unavailable on this instance 2026-08-01 across 5 path variants — docstring now points to list_change_approval_levels. Approval-level write ops (add/edit/delete/approver) documented only — not implemented (change-create is rate-limited on this instance, couldn't safely verify). |
 | Releases | 12 | Core CRUD + notes (add/list/edit), tasks (add/list, stage required), worklogs (add/list), close (permission-gated on this instance). No approval-level management. |
-| Projects | 13 | Core CRUD (delete is permanent — no move_to_trash endpoint) + milestones (add/list), tasks (add/list, no stage requirement), members (add/list, email resolution quirk), comments (add/list, `content` field). Confirmed live 2026-08-01. |
+| Projects | 14 | Core CRUD (delete is permanent — no move_to_trash endpoint) + milestones (add/list), tasks (add/list, no stage requirement), members (add/list/remove, email resolution bug root-caused and fixed with verify+rollback), comments (add/list, `content` field). Confirmed live 2026-08-01. |
 | Assets | 8 | Core CRUD + delete (added 2026-08-01, permanent) + depreciation fields + depreciation types + workstations. |
 | CMDB | 7 | List/get/create/update/delete all covered (delete added 2026-08-01, permanent). Relationship listing works; adding relationships still unresolved. |
-| Solutions | 8 | Read/create/update, approve-reject (via update_solution), topic create, attachment upload. Delete implemented but unresolved live ("Not in trash"); publish is cloud-only (404). |
+| Solutions | 8 | Read/create/update, approve-reject (via update_solution), topic create, attachment upload. Delete confirmed live 2026-08-01 (two-step move-to-trash then purge); publish is cloud-only (404). |
 | Contracts + Purchase Orders | 8 | Full list/get/create/update for both (PO writes added 2026-08-01). No contract renewal or PO receive/approve workflow actions. |
 | Admin / Lookup | 19 | List/get only. Includes products (list/get), product types, closure codes and change types (added 2026-08-01, confirmed live). No user/group management. Change risks confirmed unavailable on this instance (404). |
-| **Total** | **161** | |
+| **Total** | **162** | |

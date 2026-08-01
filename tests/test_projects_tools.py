@@ -120,14 +120,89 @@ async def test_list_project_members_url() -> None:
 
 
 @respx.mock
-async def test_add_project_member_payload_shape() -> None:
-    route = respx.post(f"{BASE}/projects/1/members").mock(
-        return_value=httpx.Response(200, json={"member": {"id": "1"}})
+async def test_add_project_member_resolves_email_then_verifies() -> None:
+    respx.get(f"{BASE}/users").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "users": [
+                    {"linked_instance": {"name": "John Doe"}, "email_id": "jdoe@example.com"}
+                ]
+            },
+        )
     )
-    await get_tool("add_project_member").fn(project_id="1", technician_email="jdoe@example.com")
-    payload = decode_body(route.calls[0])
-    assert payload["member"]["user"] == {"email_id": "jdoe@example.com"}
+    post_route = respx.post(f"{BASE}/projects/1/members").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "member": {
+                    "id": "9",
+                    "user": {"name": "John Doe", "email_id": "jdoe@example.com"},
+                }
+            },
+        )
+    )
+    result = await get_tool("add_project_member").fn(
+        project_id="1", technician_email="jdoe@example.com"
+    )
+    payload = decode_body(post_route.calls[0])
+    assert payload["member"]["user"] == {"name": "John Doe"}
     assert payload["member"]["role"] == {"name": "Team Member"}
+    assert "error" not in result
+
+
+@respx.mock
+async def test_add_project_member_ambiguous_email_refused() -> None:
+    respx.get(f"{BASE}/users").mock(return_value=httpx.Response(200, json={"users": []}))
+    post_route = respx.post(f"{BASE}/projects/1/members")
+    result = await get_tool("add_project_member").fn(
+        project_id="1", technician_email="jdoe@example.com"
+    )
+    assert "error" in result
+    assert not post_route.called
+
+
+@respx.mock
+async def test_add_project_member_wrong_person_rolled_back() -> None:
+    respx.get(f"{BASE}/users").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "users": [
+                    {"linked_instance": {"name": "Chris Libby"}, "email_id": "clibby@example.com"}
+                ]
+            },
+        )
+    )
+    respx.post(f"{BASE}/projects/1/members").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "member": {
+                    "id": "9312",
+                    "user": {"name": "Chris Libby", "email_id": "clibbyrt@example.com"},
+                }
+            },
+        )
+    )
+    delete_route = respx.delete(f"{BASE}/projects/1/members/9312").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    result = await get_tool("add_project_member").fn(
+        project_id="1", technician_email="clibby@example.com"
+    )
+    assert "error" in result
+    assert delete_route.called
+    assert result["wrongly_added"]["email_id"] == "clibbyrt@example.com"
+
+
+@respx.mock
+async def test_remove_project_member_url() -> None:
+    route = respx.delete(f"{BASE}/projects/1/members/9").mock(
+        return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
+    )
+    await get_tool("remove_project_member").fn(project_id="1", member_id="9")
+    assert route.called
 
 
 @respx.mock
