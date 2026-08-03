@@ -200,4 +200,4 @@ See [NEXTSTEPS.md](NEXTSTEPS.md) for the full list. Highlights:
 
 ## License
 
-MIT — see [LICENSE](LICENSE) for details.
+Apache License 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE) for details.
