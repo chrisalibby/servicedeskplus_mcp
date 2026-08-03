@@ -6,7 +6,7 @@ Run with: uv run pytest tests/integration/ -v -m integration
 
 import pytest
 
-from .conftest import skip_if_no_server
+from .conftest import TEST_TECHNICIAN_EMAIL, skip_if_no_server
 
 pytestmark = [pytest.mark.integration, skip_if_no_server]
 
@@ -91,13 +91,15 @@ async def test_add_and_list_note(client) -> None:
 
 async def test_add_worklog(client) -> None:
     """Create a request and log 30 minutes of work."""
+    if not TEST_TECHNICIAN_EMAIL:
+        pytest.skip("SDP_TEST_TECHNICIAN_EMAIL not set in .env")
     request_id = await _create(client, "worklog test")
     try:
         worklog = await client.post(f"/requests/{request_id}/worklogs", {
             "worklog": {
                 "description": "Integration test worklog",
                 "time_spent": {"hours": 0, "minutes": 30},
-                "owner": {"email_id": "clibby@spero.financial"},
+                "owner": {"email_id": TEST_TECHNICIAN_EMAIL},
             }
         })
         assert "worklog" in worklog

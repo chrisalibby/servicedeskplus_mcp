@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from .conftest import skip_if_no_server
+from .conftest import TEST_TECHNICIAN_EMAIL, skip_if_no_server
 
 pytestmark = [pytest.mark.integration, skip_if_no_server]
 
@@ -330,6 +330,8 @@ async def test_request_task_get_update_delete_roundtrip(client) -> None:
 
 async def test_problem_worklog_update_delete_roundtrip(client) -> None:
     """New Part 3 tools: update_problem_worklog / delete_problem_worklog."""
+    if not TEST_TECHNICIAN_EMAIL:
+        pytest.skip("SDP_TEST_TECHNICIAN_EMAIL not set in .env")
     params = {"input_data": json.dumps({"list_info": {"start_index": 0, "row_count": 1}})}
     problems = await client.get("/problems", params=params)
     plist = problems.get("problems", [])
@@ -343,7 +345,7 @@ async def test_problem_worklog_update_delete_roundtrip(client) -> None:
             "worklog": {
                 "description": "[TEST] worklog edit/delete roundtrip - safe to delete",
                 "time_spent": {"hours": 0, "minutes": 1},
-                "owner": {"email_id": "clibby@spero.financial"},
+                "owner": {"email_id": TEST_TECHNICIAN_EMAIL},
             }
         },
     )
@@ -523,6 +525,8 @@ async def test_request_approval_roundtrip(client) -> None:
 
     CAUTION: approver is the API key owner (Chris Libby) only — never point this at a
     real colleague, since send_request_approval_notification sends a real email."""
+    if not TEST_TECHNICIAN_EMAIL:
+        pytest.skip("SDP_TEST_TECHNICIAN_EMAIL not set in .env")
     req = await client.post(
         "/requests",
         {
@@ -543,7 +547,7 @@ async def test_request_approval_roundtrip(client) -> None:
         assert "error" not in levels, levels.get("error")
         assert levels["approval_levels"] == []
 
-        approver = {"approver": {"email_id": "clibby@spero.financial"}}
+        approver = {"approver": {"email_id": TEST_TECHNICIAN_EMAIL}}
         created = await client.post(
             f"/requests/{request_id}/approval_levels",
             {"approval_level": {"approvals": [approver]}},

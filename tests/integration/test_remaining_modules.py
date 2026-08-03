@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from .conftest import skip_if_no_server
+from .conftest import TEST_TECHNICIAN_EMAIL, skip_if_no_server
 
 pytestmark = [pytest.mark.integration, skip_if_no_server]
 
@@ -28,6 +28,8 @@ async def test_list_problems(client) -> None:
 async def test_problem_notes_tasks_worklogs(client) -> None:
     """Backfilled note/task/worklog tools for problems — mirrors requests.py's pattern.
     Adds a task and worklog to a real problem and cleans them up immediately after."""
+    if not TEST_TECHNICIAN_EMAIL:
+        pytest.skip("SDP_TEST_TECHNICIAN_EMAIL not set in .env")
     params = {"input_data": json.dumps({"list_info": {"start_index": 0, "row_count": 1}})}
     problems = await client.get("/problems", params=params)
     plist = problems.get("problems", [])
@@ -56,7 +58,7 @@ async def test_problem_notes_tasks_worklogs(client) -> None:
             "worklog": {
                 "description": "[TEST] integration probe - safe to delete",
                 "time_spent": {"hours": 0, "minutes": 1},
-                "owner": {"email_id": "clibby@spero.financial"},
+                "owner": {"email_id": TEST_TECHNICIAN_EMAIL},
             }
         },
     )
@@ -85,6 +87,8 @@ async def test_list_changes(client) -> None:
 async def test_change_notes_tasks_worklogs(client) -> None:
     """Backfilled note/task/worklog tools for changes — mirrors requests.py's pattern.
     Adds a task and worklog to a real change and cleans them up immediately after."""
+    if not TEST_TECHNICIAN_EMAIL:
+        pytest.skip("SDP_TEST_TECHNICIAN_EMAIL not set in .env")
     list_info = {
         "start_index": 0,
         "row_count": 5,
@@ -126,7 +130,7 @@ async def test_change_notes_tasks_worklogs(client) -> None:
             "worklog": {
                 "description": "[TEST] integration probe - safe to delete",
                 "time_spent": {"hours": 0, "minutes": 1},
-                "owner": {"email_id": "clibby@spero.financial"},
+                "owner": {"email_id": TEST_TECHNICIAN_EMAIL},
             }
         },
     )
@@ -155,6 +159,8 @@ async def test_list_releases(client) -> None:
 async def test_release_create_get_note_roundtrip(client) -> None:
     """Creates a real release (title is the only mandatory field on this instance),
     round-trips get/note/task/worklog, then trashes it (move_to_trash — recoverable)."""
+    if not TEST_TECHNICIAN_EMAIL:
+        pytest.skip("SDP_TEST_TECHNICIAN_EMAIL not set in .env")
     created = await client.post(
         "/releases", {"release": {"title": "[TEST] MCP integration probe - safe to delete"}}
     )
@@ -186,7 +192,7 @@ async def test_release_create_get_note_roundtrip(client) -> None:
                 "worklog": {
                     "description": "[TEST] integration probe - safe to delete",
                     "time_spent": {"hours": 0, "minutes": 1},
-                    "owner": {"email_id": "clibby@spero.financial"},
+                    "owner": {"email_id": TEST_TECHNICIAN_EMAIL},
                 }
             },
         )

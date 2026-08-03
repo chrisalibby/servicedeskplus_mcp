@@ -169,7 +169,7 @@ async def test_add_project_member_wrong_person_rolled_back() -> None:
             200,
             json={
                 "users": [
-                    {"linked_instance": {"name": "Chris Libby"}, "email_id": "clibby@example.com"}
+                    {"linked_instance": {"name": "Pat Doe"}, "email_id": "pdoe@example.com"}
                 ]
             },
         )
@@ -180,7 +180,7 @@ async def test_add_project_member_wrong_person_rolled_back() -> None:
             json={
                 "member": {
                     "id": "9312",
-                    "user": {"name": "Chris Libby", "email_id": "clibbyrt@example.com"},
+                    "user": {"name": "Pat Doe", "email_id": "pdoe2@example.com"},
                 }
             },
         )
@@ -189,11 +189,11 @@ async def test_add_project_member_wrong_person_rolled_back() -> None:
         return_value=httpx.Response(200, json={"response_status": {"status": "success"}})
     )
     result = await get_tool("add_project_member").fn(
-        project_id="1", technician_email="clibby@example.com"
+        project_id="1", technician_email="pdoe@example.com"
     )
     assert "error" in result
     assert delete_route.called
-    assert result["wrongly_added"]["email_id"] == "clibbyrt@example.com"
+    assert result["wrongly_added"]["email_id"] == "pdoe2@example.com"
 
 
 @respx.mock

@@ -412,7 +412,7 @@ These features exist in ServiceDesk Plus but are **not exposed through the REST 
 
 ## Cloud-only or unconfirmed modules
 
-These endpoints exist in the cloud API and share the same path structure. Availability on the Spero instance is unconfirmed and requires live testing.
+These endpoints exist in the cloud API and share the same path structure. Availability on the tested instance is unconfirmed and requires live testing.
 
 | Module | Endpoint root | Notes |
 |---|---|---|
@@ -430,7 +430,7 @@ These endpoints exist in the cloud API and share the same path structure. Availa
 
 ## Contracts & Purchase Orders
 
-> Both endpoints confirmed live on the Spero instance (2026-07-17). Contract write support added
+> Both endpoints confirmed live on the tested instance (2026-07-17). Contract write support added
 > 2026-07-20 — mandatory fields confirmed live: `name`, `custom_contract_id`, `type`, `vendor`,
 > `from_date`/`to_date`. Purchase order write support added 2026-08-01 — mandatory fields
 > confirmed live: `name`, `custom_po_id`, `vendor`, `requested_by`, `items` (each line item needs

@@ -2,7 +2,7 @@
 
 ## Current state (as of 2026-08-01)
 
-Integration tested against `sdp.example.com` (Spero Financial SDP on-prem instance).
+Integration tested against `sdp.example.com` (tested SDP on-prem instance).
 All unit tests pass (234). Integration tests: 52+ pass (added note get/delete roundtrip
 2026-08-01), 2 skip, 3 intermittently blocked by SDP's `POST /changes` rate limit (see Known
 Gaps below) — re-run after a pause if those fail.
@@ -52,7 +52,7 @@ Gaps below) — re-run after a pause if those fail.
 | **`reply_request`/`forward_request`** | Not supported by the on-prem v3 REST API — the only email-shaped resource (`/requests/{id}/drafts`) only saves an unsent draft, no send/dispatch operation exists. Documented platform gap, closed out 2026-08-01 (see Future development below). |
 | **@mentions on notes** | Not supported by the API — `request_note.html` schema has no `notify_to`/`mentions` field. Documented platform gap, closed out 2026-08-01 (see Future development below). |
 
-### Instance-specific configuration (Spero Financial)
+### Instance-specific configuration (example)
 
 - **Server:** `sdp.example.com:443` (HTTPS, self-signed cert)
 - **SSL:** `SDP_VERIFY_SSL=false`
@@ -145,7 +145,7 @@ pytest tests/integration/ -m integration -v
 
 ### Future development (not urgent)
 
-- **Cloud / OAuth2 support** — SDP Cloud uses OAuth2 instead of API key auth; planned if Spero ever migrates to cloud.
+- **Cloud / OAuth2 support** — SDP Cloud uses OAuth2 instead of API key auth; planned if the target instance ever migrates to cloud.
 - ~~**Attachments**~~ — done 2026-08-01: `list_request_attachments`, `get_request_attachment_content` (download), `add_request_attachment` (upload) confirmed live end-to-end (upload → list → download byte-for-byte match → trashed). See CLAUDE.md quirks table for the `_download`/`upload` path details.
 - ~~**Purchase order writes**~~ — done 2026-08-01: `create_purchase_order`/`update_purchase_order` confirmed live; mandatory `items` line-item schema resolved (`product`, `ordered_quantity`, `price`, `category`).
 - **CMDB relationship writes** — `add_ci_relationship` still 400s on `relationship_type` regardless of shape tried; likely needs a relationship-type lookup endpoint that doesn't exist yet.

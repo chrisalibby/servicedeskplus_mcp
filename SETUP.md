@@ -158,7 +158,7 @@ In Claude Desktop, start a new conversation and type:
 
 > List my open ServiceDesk Plus tickets.
 
-Claude should call the `list_requests` tool and return your open tickets. If you see an error about the server, check that you are on the Spero network or VPN.
+Claude should call the `list_requests` tool and return your open tickets. If you see an error about the server, check that you are on the internal network or VPN.
 
 ### Optional — verify the test suite
 
@@ -332,7 +332,7 @@ Replace the URL with your actual server hostname, and `<paste your key here>` wi
 key. Save the file and restart Claude Desktop.
 
 > **Network requirement:** Claude Desktop must be able to reach the server. If it is hosted on the
-> Spero internal network, you must be on-site or connected to VPN.
+> internal network, you must be on-site or connected to VPN.
 
 ---
 

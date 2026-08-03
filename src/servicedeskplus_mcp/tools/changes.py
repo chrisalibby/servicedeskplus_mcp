@@ -273,7 +273,7 @@ def register(app: FastMCP) -> None:
     async def add_change_worklog(
         change_id: Annotated[str, "Change ID"],
         description: Annotated[str, "Work performed"],
-        technician_email: Annotated[str, "Technician email address (e.g. jsmith@spero.financial)"],
+        technician_email: Annotated[str, "Technician email address (e.g. jsmith@example.com)"],
         hours: Annotated[int, "Whole hours spent"] = 0,
         minutes: Annotated[int, "Additional minutes spent (0–59)"] = 0,
     ) -> dict[str, Any]:

@@ -60,7 +60,7 @@ Docker deployment, CMDB/contract write support, and problems/changes feature par
 
 ## [Unreleased] — 2026-07-17
 
-Real-world usage punch list: fixes and gaps surfaced by production use against the Spero SDP instance.
+Real-world usage punch list: fixes and gaps surfaced by production use against a live SDP instance.
 
 ### Fixed
 
@@ -68,7 +68,7 @@ Real-world usage punch list: fixes and gaps surfaced by production use against t
 - **`list_assets` asset type filter** — now filters on `product_type.name` instead of the nonexistent `asset_type.name`, matching the real asset schema.
 - **`list_changes` sort order** — instance default returned oldest-first (changes from 2020 on page 1). Now defaults to `created_time` descending; `sort_field`/`sort_order` params exposed.
 - **CDATA artifacts in rendered HTML** — wrapping HTML in `<![CDATA[...]]>` leaked a stray `]]>` into rendered descriptions. All description/note/resolution fields across requests, changes, and problems now strip CDATA wrappers before sending; param descriptions state that raw HTML is supported directly.
-- **Urgency on `create_request`** — investigated live in every format (name and ID, on create and follow-up PUT): the Spero instance rejects urgency unconditionally because the field is not on the request form (all live requests have `urgency: null`). Documented as an instance limitation; the param description now directs users to set priority instead. An integration test locks in the quirk and will flag if the instance ever starts accepting it.
+- **Urgency on `create_request`** — investigated live in every format (name and ID, on create and follow-up PUT): the tested instance rejects urgency unconditionally because the field is not on the request form (all live requests have `urgency: null`). Documented as an instance limitation; the param description now directs users to set priority instead. An integration test locks in the quirk and will flag if the instance ever starts accepting it.
 
 ### Added
 
@@ -77,7 +77,7 @@ Real-world usage punch list: fixes and gaps surfaced by production use against t
   - GETs retry up to 2 extra attempts with backoff on timeout/connect errors (idempotent).
   - POST/PUT/DELETE never auto-retry; on timeout they return `indeterminate: true` with a warning that the write may have landed — verify before retrying to avoid duplicates.
   - `add_request_note` verifies after an indeterminate POST by re-fetching the notes list, returning `posted: true`, `posted: false`, or `posted: "unknown"`.
-- **Contracts + Purchase Orders module** (`tools/contracts.py`) — `list_contracts`, `get_contract`, `list_purchase_orders`, `get_purchase_order`. Both endpoints confirmed live on the Spero instance. Read-only this round.
+- **Contracts + Purchase Orders module** (`tools/contracts.py`) — `list_contracts`, `get_contract`, `list_purchase_orders`, `get_purchase_order`. Both endpoints confirmed live on the tested instance. Read-only this round.
 - **Product catalog lookups** (`tools/admin.py`) — `list_products` (with name / product type filters) and `list_product_types`, closing the "no way to list asset types" gap.
 - **`list_requests` subject search** — `search` param (contains match on subject). Cannot be combined with date filters (existing instance quirk).
 - **`list_assets` `missing_product_type` filter** — SDP null-check convention (`condition: "is"`, empty `values`); syntax accepted by the live instance.
@@ -100,7 +100,7 @@ Initial development cycle.
 
 - MCP server (FastMCP, stdio transport) exposing ServiceDesk Plus On-Premise API v3: requests (CRUD, notes, worklogs, resolution, tasks, assign/pickup), problems, changes (incl. approvals), assets/workstations, CMDB, solutions, and admin lookups — 66 tools at cycle end (2026-06-05 through 2026-06-17).
 - HTTP transport mode with per-connection API key support (`X-SDP-API-Key` header) alongside stdio (2026-06-12).
-- Integration test suite against the live Spero instance; unit suite with respx mocks.
+- Integration test suite against a live SDP instance; unit suite with respx mocks.
 - Cross-platform setup (macOS/Windows) and handoff documentation (SETUP.md, NEXTSTEPS.md, API_COVERAGE.md).
 
 ### Fixed
@@ -109,5 +109,5 @@ Initial development cycle.
 
 ### Known limitations
 
-- `add_request_worklog` returns 400 in all field formats on the Spero instance — needs a browser network capture to debug.
-- `/groups` and CMDB create/update/relationships unavailable on the Spero instance.
+- `add_request_worklog` returns 400 in all field formats on the tested instance — needs a browser network capture to debug.
+- `/groups` and CMDB create/update/relationships unavailable on the tested instance.

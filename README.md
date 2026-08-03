@@ -26,7 +26,7 @@ Three `sdp://schema/...` resources document write shapes that are easy to get wr
 
 See [API_COVERAGE.md](API_COVERAGE.md) and [NEXTSTEPS.md](NEXTSTEPS.md) for the full per-module breakdown. Notable gaps:
 
-- `add_request_worklog` — the POST is broken on the requests endpoint on some on-prem instances (the identical payload works fine on problems and changes); confirmed on the Spero instance.
+- `add_request_worklog` — the POST is broken on the requests endpoint on some on-prem instances (the identical payload works fine on problems and changes); confirmed on the tested instance.
 - `add_ci_relationship` — 400s on the relationship-type field regardless of shape tried; likely needs a relationship-type lookup endpoint that doesn't exist yet.
 - `close_change` — direct status transitions are rejected where the instance enforces workflow progression (Requested → In Review → Approved → In Progress → Completed).
 - No email send API — the on-prem v3 REST API can only save an unsent draft reply/forward (`/requests/{id}/drafts`); there is no dispatch/send operation, so `reply_request`/`forward_request` were not built.

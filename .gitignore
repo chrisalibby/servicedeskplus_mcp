@@ -13,3 +13,5 @@ build/
 .mypy_cache/
 *.so
 .DS_Store
+CLAUDE.local.md
+servicedesk-mcp-punch-list.md

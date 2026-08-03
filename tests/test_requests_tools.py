@@ -860,11 +860,11 @@ async def test_add_request_approval_level_email_approver() -> None:
         return_value=httpx.Response(200, json={"approval_level": {"id": "1"}})
     )
     await get_tool("add_request_approval_level").fn(
-        request_id="8", approver="clibby@spero.financial"
+        request_id="8", approver="jsmith@example.com"
     )
     payload = decode_body(route.calls[0])
     assert payload["approval_level"]["approvals"] == [
-        {"approver": {"email_id": "clibby@spero.financial"}}
+        {"approver": {"email_id": "jsmith@example.com"}}
     ]
 
 
@@ -893,10 +893,10 @@ async def test_add_request_approver_payload_shape() -> None:
         return_value=httpx.Response(200, json={"approval": {"id": "1"}})
     )
     await get_tool("add_request_approver").fn(
-        request_id="8", level_id="3", approver="clibby@spero.financial", comments="please review"
+        request_id="8", level_id="3", approver="jsmith@example.com", comments="please review"
     )
     payload = decode_body(route.calls[0])
-    assert payload["approval"]["approver"] == {"email_id": "clibby@spero.financial"}
+    assert payload["approval"]["approver"] == {"email_id": "jsmith@example.com"}
     assert payload["approval"]["comments"] == "please review"
 
 

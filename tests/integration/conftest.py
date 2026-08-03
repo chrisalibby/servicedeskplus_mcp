@@ -18,6 +18,8 @@ _key = _env.get("SDP_API_KEY", "")
 _server = _env.get("SDP_SERVER", "")
 _live = bool(_key and _server and _key != "your-api-key-here")
 
+TEST_TECHNICIAN_EMAIL = _env.get("SDP_TEST_TECHNICIAN_EMAIL") or ""
+
 skip_if_no_server = pytest.mark.skipif(
     not _live,
     reason="No live SDP server configured — set SDP_SERVER and SDP_API_KEY in .env",
