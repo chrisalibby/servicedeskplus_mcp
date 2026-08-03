@@ -130,6 +130,28 @@ Replace `<paste your key here>` with your actual API key. Save the file, then **
 
 > **If `sdp-mcp` is not on your PATH**, use the full path as the `"command"` value instead. On Mac, run `which sdp-mcp` in Terminal to find it. On Windows, run `where sdp-mcp` in Command Prompt and use backslashes: `"C:\\Users\\<you>\\...\\sdp-mcp.exe"`.
 
+**Alternative — run from a cloned repo with uv** (no install step; useful for development):
+
+```json
+{
+  "mcpServers": {
+    "servicedeskplus": {
+      "command": "uv",
+      "args": ["run", "--project", "/Users/<you>/Projects/servicedeskplus_mcp", "sdp-mcp"],
+      "env": {
+        "SDP_SERVER": "sdp.example.com",
+        "SDP_PORT": "443",
+        "SDP_API_KEY": "<paste your key here>",
+        "SDP_VERIFY_SSL": "false",
+        "SDP_TIMEOUT": "30"
+      }
+    }
+  }
+}
+```
+
+> **Use an absolute path** for `--project` (and for `"command"` if `uv` isn't on Claude Desktop's PATH — run `which uv` to find it, e.g. `/opt/homebrew/bin/uv`). Claude Desktop launches the command without a shell, so `~` is **not** expanded — `"~/Projects/..."` fails with `Project directory does not exist`.
+
 ## Step 6 — Verify
 
 In Claude Desktop, start a new conversation and type:
