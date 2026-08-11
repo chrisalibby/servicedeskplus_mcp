@@ -307,31 +307,79 @@ Reload your proxy after saving the config.
 
 ### Technician: Claude Desktop config
 
+Claude Desktop's `claude_desktop_config.json` does **not** support a remote HTTP server declared
+directly as `"url"` + `"headers"` — that shape is silently rejected ("Some MCP servers could not
+be loaded", entry skipped) in current versions. Remote servers with custom auth headers are only
+supported through the in-app **Settings → Connectors → Add custom connector** UI, and that UI has
+had its own bugs around headers being silently ignored. The reliable option is to bridge through
+[`mcp-remote`](https://www.npmjs.com/package/mcp-remote), a local stdio-to-HTTP proxy that Claude
+Desktop launches like any other local command, forwarding your header to the real server underneath.
+
 Each technician gets their SDP API key (Step 3 of the local install guide) and adds this to their
-Claude Desktop config instead of the local-command version:
+Claude Desktop config instead of the local-command version. Requires Node.js/`npx` on the
+technician's machine.
 
 **Config file location:**
 
 - Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
+**Mac/Linux:**
+
 ```json
 {
   "mcpServers": {
     "servicedeskplus": {
-      "url": "https://mcp.yourdomain.local/mcp",
-      "headers": {
-        "X-SDP-Api-Key": "<paste your key here>"
-      }
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.yourdomain.local/mcp",
+        "--header",
+        "X-SDP-Api-Key: <paste your key here>"
+      ]
+    }
+  }
+}
+```
+
+**Windows:** plain `"command": "npx"` fails here — when Node.js is installed at the default
+`C:\Program Files\nodejs`, Claude Desktop resolves `npx` to that absolute path and hands it to
+`cmd.exe` unquoted, which splits on the space and fails with `'C:\Program' is not recognized as an
+internal or external command`. Wrap it in `cmd /c` so `cmd.exe`'s own PATH lookup finds `npx`
+instead of Claude Desktop pre-resolving a space-containing path:
+
+```json
+{
+  "mcpServers": {
+    "servicedeskplus": {
+      "command": "cmd",
+      "args": [
+        "/c",
+        "npx",
+        "-y",
+        "mcp-remote",
+        "https://mcp.yourdomain.local/mcp",
+        "--header",
+        "X-SDP-Api-Key: <paste your key here>"
+      ]
     }
   }
 }
 ```
 
 Replace the URL with your actual server hostname, and `<paste your key here>` with your SDP API
-key. Save the file and restart Claude Desktop.
+key. Save the file and fully quit/relaunch Claude Desktop (not just close the window).
 
-> **Network requirement:** Claude Desktop must be able to reach the server. If it is hosted on the
+**Claude Code CLI** can point at the same remote server directly, without `mcp-remote`, since it
+supports HTTP transport with custom headers natively:
+
+```bash
+claude mcp add --transport http servicedeskplus https://mcp.yourdomain.local/mcp \
+  --header "X-SDP-Api-Key: <paste your key here>"
+```
+
+> **Network requirement:** the client must be able to reach the server. If it is hosted on the
 > internal network, you must be on-site or connected to VPN.
 
 ---
