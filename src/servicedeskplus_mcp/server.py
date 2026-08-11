@@ -3,6 +3,7 @@
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from .client import request_api_key
 from .tools import (
@@ -19,7 +20,14 @@ from .tools import (
     solutions,
 )
 
-mcp = FastMCP("ServiceDesk Plus")
+# FastMCP auto-enables DNS-rebinding Host-header checks (allowing only 127.0.0.1/localhost/::1)
+# because it defaults to host="127.0.0.1", regardless of the SDP_HTTP_HOST uvicorn actually binds
+# to in __main__.py. That 421s any request through a reverse proxy. Auth is already enforced by
+# _ApiKeyMiddleware below, so disable the redundant Host check rather than maintaining an allowlist.
+mcp = FastMCP(
+    "ServiceDesk Plus",
+    transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
+)
 
 requests.register(mcp)
 problems.register(mcp)
